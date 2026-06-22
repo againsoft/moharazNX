@@ -1368,6 +1368,50 @@ def ensure_product_columns() -> None:
             conn.execute(text(stmt))
 
 
+def _slugify_username(value: str) -> str:
+    import re
+
+    value = value.lower().strip()
+    value = re.sub(r"[^a-z0-9._-]", "", value)
+    value = re.sub(r"[-_.]{2,}", "_", value)
+    return value[:32].strip("_.-") or "user"
+
+
+def ensure_auth_user_columns() -> None:
+    """Add username column and backfill legacy auth_users rows."""
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS username VARCHAR(64)"))
+
+    db = SessionLocal()
+    try:
+        users = db.query(AuthUser).all()
+        taken = {user.username for user in users if user.username}
+        changed = False
+        for user in users:
+            if user.username:
+                continue
+            base = _slugify_username(user.email.split("@")[0])
+            candidate = base
+            suffix = 2
+            while candidate in taken:
+                candidate = f"{base}{suffix}"
+                suffix += 1
+            user.username = candidate
+            taken.add(candidate)
+            changed = True
+        if changed:
+            db.commit()
+    finally:
+        db.close()
+
+    with engine.begin() as conn:
+        try:
+            conn.execute(text("ALTER TABLE auth_users ALTER COLUMN username SET NOT NULL"))
+        except Exception:
+            pass
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_auth_users_username ON auth_users (username)"))
+
+
 def link_product_taxonomy(db) -> int:
     """Backfill category_id / brand_id on products from denormalized names."""
     cat_by_name = {name: cid for name, cid in db.query(CatalogCategory.name, CatalogCategory.id).all()}
@@ -1546,10 +1590,12 @@ def seed_auth_users(db) -> int:
     for item in AUTH_USERS_SEED:
         if item["email"] in existing:
             continue
+        username = item.get("username") or _slugify_username(item["email"].split("@")[0])
         db.add(
             AuthUser(
                 id=item["id"],
                 email=item["email"],
+                username=username,
                 name=item["name"],
                 role=item["role"],
                 password_hash=hash_password(item["password"]),
@@ -1595,6 +1641,7 @@ def main() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_cloudflare_plugin_columns()
     ensure_product_columns()
+    ensure_auth_user_columns()
     print("  Tables ready.")
 
     db = SessionLocal()

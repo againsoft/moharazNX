@@ -63,11 +63,17 @@ def _bootstrap() -> None:
         import scripts.init_db  # noqa: F401 — register all models
         from app.database import Base, engine
         from app.models.auth_user import AuthUser
-        from scripts.init_db import ensure_cloudflare_plugin_columns, ensure_product_columns, main as seed_database
+        from scripts.init_db import (
+            ensure_auth_user_columns,
+            ensure_cloudflare_plugin_columns,
+            ensure_product_columns,
+            main as seed_database,
+        )
 
         Base.metadata.create_all(bind=engine)
         ensure_cloudflare_plugin_columns()
         ensure_product_columns()
+        ensure_auth_user_columns()
 
         if db.query(AuthUser).count() == 0:
             db.close()

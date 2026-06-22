@@ -1,5 +1,7 @@
 # MoharazNX — Changelog
 
+| **Fixed** | Live admin login 500 — `ensure_auth_user_columns()` migrates legacy `auth_users` (adds/backfills `username`) on API startup; auth seed includes username |
+
 | **Changed** | `Connect with Cloudflare` button always visible — install screen, plugin header, Account section |
 
 | **Changed** | Railway deploy config (`apps/api/railway.toml`) + auto `DATABASE_URL` psycopg conversion |
