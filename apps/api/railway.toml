@@ -1,8 +1,9 @@
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-# Do not run DB scripts in preDeploy — private network (postgres.railway.internal) is unavailable there.
+# startCommand intentionally removed — Dockerfile CMD uses sh -c so $PORT expands correctly
