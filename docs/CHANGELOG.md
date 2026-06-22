@@ -4,6 +4,8 @@
 
 | **Changed** | Railway deploy config (`apps/api/railway.toml`) + auto `DATABASE_URL` psycopg conversion |
 
+| **Fixed** | Remove Railway `preDeployCommand` — private DB host unavailable during pre-deploy; seed runs on app startup instead |
+
 ## 2026-06-22 — Cloudflare Connect with OAuth
 
 | Change | Detail |

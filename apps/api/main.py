@@ -55,6 +55,19 @@ require_admin = [Depends(get_current_user)]
 async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
+        import scripts.init_db  # noqa: F401 — register all models
+        from app.database import Base, engine
+        from app.models.auth_user import AuthUser
+        from scripts.init_db import ensure_cloudflare_plugin_columns, main as seed_database
+
+        Base.metadata.create_all(bind=engine)
+        ensure_cloudflare_plugin_columns()
+
+        if db.query(AuthUser).count() == 0:
+            db.close()
+            seed_database()
+            db = SessionLocal()
+
         sync_env_openai_connection(db, test_connect=False)
     except Exception:
         pass

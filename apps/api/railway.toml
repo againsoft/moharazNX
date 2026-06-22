@@ -7,4 +7,4 @@ startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
-preDeployCommand = "PYTHONPATH=. python scripts/ensure_tables.py && PYTHONPATH=. python scripts/init_db.py"
+# Do not run DB scripts in preDeploy — private network (postgres.railway.internal) is unavailable there.
