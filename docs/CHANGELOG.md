@@ -2,6 +2,8 @@
 
 | **Changed** | `Connect with Cloudflare` button always visible — install screen, plugin header, Account section |
 
+| **Changed** | Railway deploy config (`apps/api/railway.toml`) + auto `DATABASE_URL` psycopg conversion |
+
 ## 2026-06-22 — Cloudflare Connect with OAuth
 
 | Change | Detail |

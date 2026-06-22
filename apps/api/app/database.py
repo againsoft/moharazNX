@@ -31,7 +31,10 @@ def get_db() -> Generator[Session, None, None]:
 
 def check_database_connection() -> dict:
     """Ping database — used by /health and test script."""
-    with engine.connect() as conn:
-        row = conn.execute(text("SELECT 1 AS ok")).mappings().one()
-        version = conn.execute(text("SELECT VERSION() AS version")).mappings().one()
-    return {"ok": row["ok"] == 1, "version": version["version"]}
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT 1 AS ok")).mappings().one()
+            version = conn.execute(text("SELECT version() AS version")).mappings().one()
+        return {"ok": row["ok"] == 1, "version": version["version"]}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}

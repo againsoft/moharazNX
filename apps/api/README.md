@@ -53,6 +53,72 @@ uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 DATABASE_URL=postgresql+psycopg://moharaznx:moharaznx@127.0.0.1:5433/moharaznx
 ```
 
+Railway injects `DATABASE_URL` automatically when PostgreSQL is linked (converted to `postgresql+psycopg` in `app/config.py`).
+
+## Deploy on Railway (API + PostgreSQL)
+
+Repo: [github.com/againsoft/moharazNX](https://github.com/againsoft/moharazNX)
+
+### 1. Create project
+
+1. [railway.app](https://railway.app) → **New Project**
+2. **Deploy from GitHub repo** → select `againsoft/moharazNX`
+
+### 2. Add PostgreSQL
+
+1. Project → **+ New** → **Database** → **PostgreSQL**
+2. Wait until the database is running
+
+### 3. Add API service
+
+1. **+ New** → **GitHub Repo** → same repo (or duplicate service)
+2. Service **Settings**:
+
+| Setting | Value |
+|---------|-------|
+| **Root Directory** | `apps/api` |
+| **Start Command** | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+
+(`apps/api/railway.toml` already defines build/start/pre-deploy.)
+
+### 4. Connect database to API
+
+1. Open **API service** → **Variables**
+2. **+ New Variable** → **Add Reference** → select PostgreSQL → `DATABASE_URL`
+3. Add manually:
+
+```env
+APP_ENV=production
+APP_DEBUG=false
+CORS_ORIGINS=https://your-app.vercel.app,http://localhost:3000
+```
+
+4. **Settings** → **Networking** → **Generate Domain** (public URL, e.g. `moharaznx-api.up.railway.app`)
+
+### 5. Verify
+
+- Health: `https://YOUR-RAILWAY-URL/health`
+- Swagger: `https://YOUR-RAILWAY-URL/docs`
+- Login seed: `admin@moharaznx.com` / `admin123` (from `init_db.py`, runs on pre-deploy)
+
+### 6. Connect Vercel UI
+
+Vercel env:
+
+```env
+NEXT_PUBLIC_API_URL=https://YOUR-RAILWAY-URL
+```
+
+### CLI (optional)
+
+```bash
+npm i -g @railway/cli
+railway login
+cd apps/api
+railway link
+railway run PYTHONPATH=. python scripts/init_db.py
+```
+
 ## Spec reference
 
 - AgainERP: `docs/03-business-modules/ecommerce/catalog/ARCHITECTURE.md`

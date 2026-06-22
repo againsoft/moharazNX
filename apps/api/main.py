@@ -55,7 +55,9 @@ require_admin = [Depends(get_current_user)]
 async def lifespan(_app: FastAPI):
     db = SessionLocal()
     try:
-        sync_env_openai_connection(db, test_connect=True)
+        sync_env_openai_connection(db, test_connect=False)
+    except Exception:
+        pass
     finally:
         db.close()
     yield

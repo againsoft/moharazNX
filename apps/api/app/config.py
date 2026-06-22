@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,6 +31,19 @@ class Settings(BaseSettings):
 
     # OpenAI — wired when real AI provider step lands (AgainERP-aligned)
     openai_api_key: str = ""
+
+    @model_validator(mode="after")
+    def normalize_database_url(self) -> "Settings":
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql+psycopg://", 1)
+        elif url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        # Railway public proxy requires SSL; internal *.railway.internal does not
+        if ".railway.app" in url and "sslmode=" not in url:
+            url += "&sslmode=require" if "?" in url else "?sslmode=require"
+        object.__setattr__(self, "database_url", url)
+        return self
 
 
 @lru_cache
