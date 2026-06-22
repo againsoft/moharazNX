@@ -68,7 +68,6 @@ def build_authorize_url(state: str) -> str:
         "client_id": settings.cloudflare_oauth_client_id.strip(),
         "redirect_uri": settings.cloudflare_oauth_redirect_uri.strip(),
         "response_type": "code",
-        "scope": settings.cloudflare_oauth_scopes.strip(),
         "state": state,
     }
     return f"{CF_AUTH_URL}?{urlencode(params)}"
