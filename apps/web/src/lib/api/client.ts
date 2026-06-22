@@ -1,8 +1,31 @@
 import { getStoredAuthToken, useAdminAuth } from "@/lib/store/admin-auth-store";
 
+const LOCAL_API_URL = "http://127.0.0.1:8000";
+const PRODUCTION_API_URL = "https://moharaznx-production.up.railway.app";
+
+function isLocalApiUrl(url: string): boolean {
+  return url === LOCAL_API_URL || url === "http://localhost:8000";
+}
+
 /** FastAPI base URL — no trailing slash. */
 export function getApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim().replace(/\/$/, "");
+  if (configured && !isLocalApiUrl(configured)) {
+    return configured;
+  }
+
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host.endsWith(".vercel.app")) {
+      return PRODUCTION_API_URL;
+    }
+  }
+
+  if (process.env.VERCEL === "1") {
+    return PRODUCTION_API_URL;
+  }
+
+  return configured || LOCAL_API_URL;
 }
 
 export class ApiError extends Error {

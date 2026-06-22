@@ -35,7 +35,13 @@ export function AdminLoginForm() {
       });
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else if (err instanceof TypeError) {
+        setError("Cannot reach API — check your connection or try again in a moment.");
+      } else {
+        setError("Login failed");
+      }
     } finally {
       setLoading(false);
     }
