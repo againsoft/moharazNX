@@ -43,20 +43,24 @@ async def verify_account_token(account_id: str, api_token: str) -> CloudflareVer
         return CloudflareVerifyResult("disconnected", "Account ID is required")
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        verify_res = await client.get(f"{CF_API}/user/tokens/verify", headers=_cf_headers(token))
-        verify_body = verify_res.json()
-        if not verify_body.get("success"):
-            return CloudflareVerifyResult("error", "Invalid API token")
-
+        # Try account endpoint directly — avoids requiring "User: API Tokens: Read" permission
         account_res = await client.get(
             f"{CF_API}/accounts/{account_id.strip()}",
             headers=_cf_headers(token),
         )
         account_body = account_res.json()
-        if not account_body.get("success"):
-            return CloudflareVerifyResult("error", "Account ID not accessible with this token")
+        if account_res.status_code == 200 and account_body.get("success"):
+            return CloudflareVerifyResult("connected", "Cloudflare account verified")
 
-    return CloudflareVerifyResult("connected", "Cloudflare account verified")
+        # Fallback: token verify endpoint (requires API Tokens: Read permission)
+        verify_res = await client.get(f"{CF_API}/user/tokens/verify", headers=_cf_headers(token))
+        verify_body = verify_res.json()
+        if verify_body.get("success"):
+            return CloudflareVerifyResult("connected", "Cloudflare account verified")
+
+        errors = account_body.get("errors", [])
+        msg = errors[0].get("message", "Invalid token or Account ID") if errors else "Invalid token or Account ID"
+        return CloudflareVerifyResult("error", msg)
 
 
 async def verify_r2_bucket(row: CloudflarePlugin) -> CloudflareVerifyResult:
