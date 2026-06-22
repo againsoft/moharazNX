@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MediaLibraryItem } from "@/lib/mock-data/media-library";
-import { getApiBaseUrl, ApiError } from "@/lib/api/client";
+import { apiFetch, getApiBaseUrl, ApiError } from "@/lib/api/client";
+import { getStoredAuthToken } from "@/lib/store/admin-auth-store";
 import {
   apiMediaToItem,
   mediaItemToApiCreate,
@@ -33,18 +34,7 @@ export function useCatalogMedia(): UseCatalogMediaState {
       if (params?.query?.trim()) query.set("query", params.query.trim());
       if (params?.type) query.set("type", params.type);
       const suffix = query.toString() ? `?${query.toString()}` : "";
-      const res = await fetch(`${getApiBaseUrl()}/api/v1/media${suffix}`);
-      if (!res.ok) {
-        let detail = res.statusText;
-        try {
-          const body = (await res.json()) as { detail?: string };
-          if (body.detail) detail = body.detail;
-        } catch {
-          /* ignore */
-        }
-        throw new ApiError(detail, res.status);
-      }
-      const data = (await res.json()) as ApiMediaListResponse;
+      const data = await apiFetch<ApiMediaListResponse>(`/api/v1/media${suffix}`);
       setItems(data.data.map(apiMediaToItem));
       setTotal(data.meta.count);
     } catch (err) {
@@ -68,39 +58,31 @@ export async function patchCatalogMediaItem(
   id: string,
   patch: Partial<Pick<MediaLibraryItem, "name" | "title" | "alt">>,
 ): Promise<MediaLibraryItem> {
-  const res = await fetch(`${getApiBaseUrl()}/api/v1/media/${id}`, {
+  const data = await apiFetch<ApiMediaResponse>(`/api/v1/media/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(mediaPatchToApi(patch)),
   });
-  if (!res.ok) {
-    throw new ApiError("Update failed", res.status);
-  }
-  const data = (await res.json()) as ApiMediaResponse;
   return apiMediaToItem(data.data);
 }
 
 export async function createCatalogMediaBatch(
   items: MediaLibraryItem[],
 ): Promise<MediaLibraryItem[]> {
-  const res = await fetch(`${getApiBaseUrl()}/api/v1/media/batch`, {
+  const data = await apiFetch<ApiMediaListResponse>(`/api/v1/media/batch`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ items: items.map(mediaItemToApiCreate) }),
   });
-  if (!res.ok) {
-    throw new ApiError("Import failed", res.status);
-  }
-  const data = (await res.json()) as ApiMediaListResponse;
   return data.data.map(apiMediaToItem);
 }
 
 export async function uploadCatalogMediaFiles(files: File[]): Promise<MediaLibraryItem[]> {
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
+  const token = getStoredAuthToken();
 
   const res = await fetch(`${getApiBaseUrl()}/api/v1/media/upload`, {
     method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
   });
   if (!res.ok) {
@@ -108,9 +90,7 @@ export async function uploadCatalogMediaFiles(files: File[]): Promise<MediaLibra
     try {
       const body = (await res.json()) as { detail?: string };
       if (body.detail) detail = body.detail;
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
     throw new ApiError(detail, res.status);
   }
   const data = (await res.json()) as ApiMediaListResponse;
@@ -118,8 +98,5 @@ export async function uploadCatalogMediaFiles(files: File[]): Promise<MediaLibra
 }
 
 export async function deleteCatalogMediaItem(id: string): Promise<void> {
-  const res = await fetch(`${getApiBaseUrl()}/api/v1/media/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
-    throw new ApiError("Delete failed", res.status);
-  }
+  await apiFetch(`/api/v1/media/${id}`, { method: "DELETE" });
 }
