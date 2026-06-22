@@ -30,6 +30,8 @@ type Props = {
   title?: string;
   accept?: MediaLibraryItemType[];
   initialSelectedIds?: string[];
+  /** When set, use these items instead of the local media store (API-backed). */
+  items?: MediaLibraryItem[];
 };
 
 export function MediaLibraryModal({
@@ -40,8 +42,10 @@ export function MediaLibraryModal({
   title = "Add Media",
   accept,
   initialSelectedIds = [],
+  items: itemsProp,
 }: Props) {
-  const items = useMediaStore((state) => state.items);
+  const storeItems = useMediaStore((state) => state.items);
+  const items = itemsProp ?? storeItems;
   const prependItems = useMediaStore((state) => state.prependItems);
   const patchMediaItem = useMediaStore((state) => state.patchMediaItem);
 

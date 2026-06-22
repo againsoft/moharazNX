@@ -10,18 +10,19 @@ import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   FILTER_DISPLAY_LABELS,
-  MOCK_FILTER_ATTRIBUTES,
   type CatalogFacetFilter,
   type FilterDisplayType,
   type FilterSource,
 } from "@/lib/mock-data/catalog-filters";
-import { toast } from "sonner";
+
+type AttributeOption = { id: string; name: string };
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode?: "create" | "edit";
   filter?: CatalogFacetFilter | null;
+  attributeOptions?: AttributeOption[];
   onSave: (data: Partial<CatalogFacetFilter>) => void;
   onLiveChange?: (data: Partial<CatalogFacetFilter> & { id: string }) => void;
 };
@@ -48,6 +49,7 @@ export function CatalogFilterFormDialog({
   onOpenChange,
   mode = "create",
   filter,
+  attributeOptions = [],
   onSave,
   onLiveChange,
 }: Props) {
@@ -85,7 +87,7 @@ export function CatalogFilterFormDialog({
     const fd = new FormData(e.currentTarget);
     const name = String(fd.get("name") ?? "");
     const paramKey = String(fd.get("paramKey") ?? "");
-    const attr = MOCK_FILTER_ATTRIBUTES.find((a) => a.id === attributeId);
+    const attr = attributeOptions.find((a) => a.id === attributeId);
 
     onSave({
       name,
@@ -99,7 +101,6 @@ export function CatalogFilterFormDialog({
       categoryScope,
       urlExample: `?${paramKey}=`,
     });
-    toast.success(mode === "create" ? "Filter created (mock)" : "Filter updated (mock)");
     onOpenChange(false);
   };
 
@@ -190,7 +191,7 @@ export function CatalogFilterFormDialog({
                     disabled={isSystem}
                   >
                     <option value="">Select attribute…</option>
-                    {MOCK_FILTER_ATTRIBUTES.map((a) => (
+                    {attributeOptions.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.name}
                       </option>

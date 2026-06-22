@@ -39,3 +39,18 @@ class VariantListResponse(BaseModel):
 class VariantResponse(BaseModel):
     data: VariantRead
     errors: List[str] = []
+
+
+class VariantUpsert(BaseModel):
+    id: Optional[str] = None
+    sku: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=255)
+    price: Decimal = Field(ge=0)
+    stock: int = Field(default=0, ge=0)
+    status: str = Field(default="draft", pattern="^(draft|published|archived)$")
+    is_default: bool = False
+    sort_order: int = 0
+
+
+class VariantBulkReplace(BaseModel):
+    variants: List[VariantUpsert] = Field(default_factory=list)

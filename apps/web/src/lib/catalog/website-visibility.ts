@@ -1,4 +1,5 @@
 import { categoriesFlat } from "@/lib/mock-data/categories";
+import type { Category } from "@/lib/mock-data/categories";
 import type { Product, ProductStatus, ProductVisibility } from "@/lib/mock-data/products";
 
 export type WebsiteBlockReason =
@@ -12,20 +13,21 @@ export type WebsiteVisibilityResult = {
   reason?: WebsiteBlockReason;
 };
 
-const categoryActiveByName = new Map(
-  categoriesFlat.map((c) => [c.name, c.active] as const),
-);
+function categoryActiveMap(categories?: Category[]) {
+  const source = categories ?? categoriesFlat;
+  return new Map(source.map((c) => [c.name, c.active] as const));
+}
 
 export function getProductVisibility(product: Product): ProductVisibility {
   return product.visibility ?? "public";
 }
 
-export function isCategoryActiveForProduct(categoryName: string): boolean {
-  const active = categoryActiveByName.get(categoryName);
+export function isCategoryActiveForProduct(categoryName: string, categories?: Category[]): boolean {
+  const active = categoryActiveMap(categories).get(categoryName);
   return active !== false;
 }
 
-export function getWebsiteVisibility(product: Product): WebsiteVisibilityResult {
+export function getWebsiteVisibility(product: Product, categories?: Category[]): WebsiteVisibilityResult {
   if (product.status === "archived") {
     return { onWebsite: false, reason: "archived" };
   }
@@ -35,14 +37,14 @@ export function getWebsiteVisibility(product: Product): WebsiteVisibilityResult 
   if (getProductVisibility(product) !== "public") {
     return { onWebsite: false, reason: "private_visibility" };
   }
-  if (!isCategoryActiveForProduct(product.category)) {
+  if (!isCategoryActiveForProduct(product.category, categories)) {
     return { onWebsite: false, reason: "inactive_category" };
   }
   return { onWebsite: true };
 }
 
-export function isProductOnWebsite(product: Product): boolean {
-  return getWebsiteVisibility(product).onWebsite;
+export function isProductOnWebsite(product: Product, categories?: Category[]): boolean {
+  return getWebsiteVisibility(product, categories).onWebsite;
 }
 
 export function websiteBlockReasonLabel(reason: WebsiteBlockReason): string {

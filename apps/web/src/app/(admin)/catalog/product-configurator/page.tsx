@@ -12,10 +12,10 @@ import {
   Puzzle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useConfiguratorProfileStore } from "@/lib/store/configurator-profile-store";
-import { useConfiguratorCategoryStore } from "@/lib/store/configurator-category-store";
-import { useConfiguratorTemplateStore } from "@/lib/store/configurator-template-store";
-import { useConfiguratorBuildStore } from "@/lib/store/configurator-build-store";
+import { useConfiguratorProfiles } from "@/lib/api/use-configurator-profiles";
+import { useConfiguratorCategories } from "@/lib/api/use-configurator-categories";
+import { useConfiguratorTemplates } from "@/lib/api/use-configurator-templates";
+import { useConfiguratorBuilds } from "@/lib/api/use-configurator-builds";
 import { useCompatibilityRuleStore } from "@/lib/store/compatibility-rule-store";
 import { CONFIGURATOR_ADMIN_BASE } from "@/components/configurator/admin/configurator-admin-page";
 
@@ -29,10 +29,10 @@ const sections = [
 ];
 
 export default function ProductConfiguratorHubPage() {
-  const profileCount = useConfiguratorProfileStore((s) => s.profiles.length);
-  const categoryCount = useConfiguratorCategoryStore((s) => s.categories.length);
-  const templateCount = useConfiguratorTemplateStore((s) => s.templates.length);
-  const buildCount = useConfiguratorBuildStore((s) => s.builds.length);
+  const { total: profileCount } = useConfiguratorProfiles();
+  const { total: categoryCount } = useConfiguratorCategories();
+  const { total: templateCount } = useConfiguratorTemplates();
+  const { total: buildCount } = useConfiguratorBuilds();
   const ruleCount = useCompatibilityRuleStore((s) => s.rules.length);
 
   return (

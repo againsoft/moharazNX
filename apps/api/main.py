@@ -22,6 +22,8 @@ from app.routers import (
     catalog_attribute_profiles,
     catalog_brands,
     catalog_categories,
+    catalog_collections,
+    catalog_filters,
     catalog_products,
     catalog_variants,
     catalog_reviews,
@@ -30,6 +32,10 @@ from app.routers import (
     commerce_suppliers,
     commerce_returns,
     commerce_refunds,
+    configurator_builds,
+    configurator_categories,
+    configurator_profiles,
+    configurator_templates,
     health,
     inventory_stock,
     inventory_warehouses,
@@ -57,10 +63,11 @@ def _bootstrap() -> None:
         import scripts.init_db  # noqa: F401 — register all models
         from app.database import Base, engine
         from app.models.auth_user import AuthUser
-        from scripts.init_db import ensure_cloudflare_plugin_columns, main as seed_database
+        from scripts.init_db import ensure_cloudflare_plugin_columns, ensure_product_columns, main as seed_database
 
         Base.metadata.create_all(bind=engine)
         ensure_cloudflare_plugin_columns()
+        ensure_product_columns()
 
         if db.query(AuthUser).count() == 0:
             db.close()
@@ -107,6 +114,8 @@ app.include_router(
 )
 app.include_router(catalog_products.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_categories.router, prefix="/api/v1/catalog", dependencies=require_admin)
+app.include_router(catalog_collections.router, prefix="/api/v1/catalog", dependencies=require_admin)
+app.include_router(catalog_filters.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_brands.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_attribute_profiles.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_variants.router, prefix="/api/v1/catalog", dependencies=require_admin)
@@ -132,6 +141,10 @@ app.include_router(marketing_audiences.router, prefix="/api/v1/marketing", depen
 app.include_router(marketing_campaigns.router, prefix="/api/v1/marketing", dependencies=require_admin)
 app.include_router(marketing_coupons.router, prefix="/api/v1/marketing", dependencies=require_admin)
 app.include_router(seo_meta.router, prefix="/api/v1/seo", dependencies=require_admin)
+app.include_router(configurator_profiles.router, prefix="/api/v1/configurator", dependencies=require_admin)
+app.include_router(configurator_categories.router, prefix="/api/v1/configurator", dependencies=require_admin)
+app.include_router(configurator_templates.router, prefix="/api/v1/configurator", dependencies=require_admin)
+app.include_router(configurator_builds.router, prefix="/api/v1/configurator", dependencies=require_admin)
 app.include_router(storefront_products.router, prefix="/api/v1/storefront")
 app.include_router(storefront_cart.router, prefix="/api/v1/storefront")
 app.include_router(storefront_checkout.router, prefix="/api/v1/storefront")

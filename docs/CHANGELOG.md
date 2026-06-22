@@ -365,3 +365,59 @@
 | **Kept** | Ecommerce admin: Catalog, Inventory, Orders, Customers, Suppliers, Marketing, Content, Builder, SEO, Media, Reports, Settings, AI OS |
 | **Kept** | Customer storefront `(storefront)/` |
 | **Updated** | Navigation, breadcrumbs, dashboard mock data — ecommerce only |
+
+## 2026-06-23 — Products full DB/API wiring (AgainERP catalog)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | Extended `catalog_products` (product_type, visibility, category_id, brand_id, SEO, tags); added `catalog_product_media`; nested `PUT /products/{id}/variants` and `/media` |
+| **Frontend** | Product form: categories/brands/media/variants from API; grid filters + website publish + live edit persist to API |
+
+## 2026-06-23 — Attributes edit + product specifications (Step 33)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `catalog_product_attribute_values` table; `attribute_profile_id` on products; `GET/PUT /products/{id}/specs` |
+| **Frontend** | Attributes add/edit pages use API; product Specifications tab loads/saves spec values via API |
+
+## 2026-06-23 — Collections API (Step 34)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `catalog_collections` table; CRUD + reorder at `/catalog/collections` |
+| **Frontend** | Collections list/grid wired to API (create, edit, live edit, reorder, delete) |
+
+## 2026-06-23 — Catalog filters API (Step 35)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `catalog_filters` table; CRUD + reorder at `/catalog/filters` |
+| **Frontend** | Filters page wired to API; suggested attributes from attribute profiles API |
+
+## 2026-06-23 — Configurator profiles API (Step 36)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `configurator_profiles` table; CRUD + bulk status + duplicate at `/configurator/profiles` |
+| **Frontend** | Profiles list/detail wired to API; hub + sibling pages use profile hook for dropdowns |
+
+## 2026-06-23 — Configurator categories API (Step 37)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `configurator_categories` table; CRUD + bulk status at `/configurator/categories`; seed PC + laptop slots |
+| **Frontend** | Categories list wired to API; form sheet + hub count use category hook |
+
+## 2026-06-23 — Configurator templates API (Step 38)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `configurator_templates` table; CRUD + bulk status + duplicate at `/configurator/templates`; seed PC starter builds |
+| **Frontend** | Templates list wired to API; form sheet + hub count use template hook |
+
+## 2026-06-23 — Saved builds API (Step 39)
+
+| Change | Detail |
+|--------|--------|
+| **Backend** | `configurator_builds` table; list + get + patch + bulk status + delete at `/configurator/builds`; seed sample customer builds |
+| **Frontend** | Builds list + detail sheet wired to API; hub count uses build hook |

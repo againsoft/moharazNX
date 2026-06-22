@@ -5,7 +5,7 @@ import { BarChart3, GitBranch, TrendingDown, TrendingUp } from "lucide-react";
 import { configuratorAnalyticsKpis, formatBdt } from "@/lib/mock-data/configurator-admin";
 import { computeErpAnalytics } from "@/lib/configurator/erp/integration-service";
 import { ERP_FUNNEL_LABELS } from "@/lib/configurator/erp/types";
-import { useConfiguratorProfileStore } from "@/lib/store/configurator-profile-store";
+import { useConfiguratorProfiles } from "@/lib/api/use-configurator-profiles";
 import { useConfiguratorBuildStore } from "@/lib/store/configurator-build-store";
 import { useConfiguratorTemplateStore } from "@/lib/store/configurator-template-store";
 import { useCompatibilityRuleStore } from "@/lib/store/compatibility-rule-store";
@@ -13,7 +13,7 @@ import { ConfiguratorAdminShell } from "@/components/configurator/admin/configur
 import { Badge } from "@/components/ui/badge";
 
 export function ConfiguratorAnalyticsDashboard() {
-  const profiles = useConfiguratorProfileStore((s) => s.profiles);
+  const { profiles } = useConfiguratorProfiles();
   const builds = useConfiguratorBuildStore((s) => s.builds);
   const templates = useConfiguratorTemplateStore((s) => s.templates);
   const rules = useCompatibilityRuleStore((s) => s.rules);

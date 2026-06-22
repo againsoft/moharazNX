@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Layers, Plus, RefreshCw, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,8 @@ type Props = {
   baseSku: string;
   basePrice: string;
   category?: string;
+  rows?: VariantMatrixRow[];
+  onRowsChange?: (rows: VariantMatrixRow[]) => void;
 };
 
 function parseValues(raw: string): string[] {
@@ -53,10 +55,22 @@ export function ProductVariantEditor({
   baseSku,
   basePrice,
   category,
+  rows: controlledRows,
+  onRowsChange,
 }: Props) {
   const [dimensions, setDimensions] = useState<VariantDimension[]>(() => getPresetDimensions(category));
-  const [rows, setRows] = useState<VariantMatrixRow[]>([]);
-  const [matrixGenerated, setMatrixGenerated] = useState(false);
+  const [internalRows, setInternalRows] = useState<VariantMatrixRow[]>([]);
+  const [matrixGenerated, setMatrixGenerated] = useState(Boolean(controlledRows?.length));
+  const rows = controlledRows ?? internalRows;
+
+  const setRows = useCallback(
+    (updater: VariantMatrixRow[] | ((prev: VariantMatrixRow[]) => VariantMatrixRow[])) => {
+      const next = typeof updater === "function" ? updater(rows) : updater;
+      if (onRowsChange) onRowsChange(next);
+      else setInternalRows(next);
+    },
+    [onRowsChange, rows],
+  );
 
   const basePriceNum = Number(basePrice) || 0;
 

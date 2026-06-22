@@ -18,9 +18,10 @@ import {
   Search,
 } from "lucide-react";
 import { toast } from "sonner";
-import { archiveCatalogProducts } from "@/lib/api/use-catalog-products";
+import { archiveCatalogProducts, publishProductToApi, unpublishProductFromApi, updateCatalogProduct } from "@/lib/api/use-catalog-products";
 import { type Product, type ProductStatus, type StockStatusLabel } from "@/lib/mock-data/products";
-import { categoriesFlat } from "@/lib/mock-data/categories";
+import type { Category } from "@/lib/mock-data/categories";
+import { categoriesFlat as defaultCategoriesFlat } from "@/lib/mock-data/categories";
 import { getProductCategoryDisplay } from "@/lib/category-utils";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useIsDark } from "@/lib/use-is-dark";
@@ -40,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ProductMobileCards } from "@/components/products/product-mobile-cards";
-import { PriceRangeFilter } from "@/components/products/price-range-filter";
+import { PriceRangeFilter, DEFAULT_PRICE_CEILING } from "@/components/products/price-range-filter";
 import { WebsiteBadge } from "@/components/products/website-badge";
 import { ActivityTriggerButton } from "@/components/activity/activity-trigger-button";
 import {
@@ -49,10 +50,6 @@ import {
   removeProductFromWebsite,
 } from "@/lib/catalog/website-visibility";
 
-const FILTER_CATEGORIES = categoriesFlat
-  .filter((c) => c.active)
-  .sort((a, b) => a.name.localeCompare(b.name));
-const CATEGORY_NAMES = FILTER_CATEGORIES.map((c) => c.name);
 const PAGE_SIZE = 25;
 const UPDATED_BY = ["Admin", "Sadia Rahman", "Rahim Uddin", "Manager"];
 const STOCK_STATUSES: StockStatusLabel[] = ["In Stock", "Low Stock", "Out of Stock", "Pre-order"];
@@ -213,8 +210,8 @@ const FORM_ONLY_FIELDS = [
   "Variants, attributes",
 ] as const;
 
-function ProductCategoryLabel({ name }: { name: string }) {
-  const { label, parentPath } = getProductCategoryDisplay(name, categoriesFlat);
+function ProductCategoryLabel({ name, categories }: { name: string; categories: Category[] }) {
+  const { label, parentPath } = getProductCategoryDisplay(name, categories);
   if (!parentPath) {
     return <span className="text-xs leading-tight">{label}</span>;
   }
@@ -226,8 +223,8 @@ function ProductCategoryLabel({ name }: { name: string }) {
   );
 }
 
-function ProductCategoryCell({ name }: { name: string }) {
-  return <ProductCategoryLabel name={name} />;
+function ProductCategoryCell({ name, categories }: { name: string; categories: Category[] }) {
+  return <ProductCategoryLabel name={name} categories={categories} />;
 }
 
 function FilterDropdownSearch({
@@ -258,14 +255,14 @@ function FilterDropdownSearch({
   );
 }
 
-function categoryMatchesSearch(name: string, query: string) {
+function categoryMatchesSearch(name: string, query: string, categories: Category[]) {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
-  const category = categoriesFlat.find((c) => c.name === name);
+  const category = categories.find((c) => c.name === name);
   if (!category) return name.toLowerCase().includes(q);
 
-  const { label, parentPath } = getProductCategoryDisplay(category.name);
+  const { label, parentPath } = getProductCategoryDisplay(category.name, categories);
   const haystack = [category.name, category.caption, label, parentPath ?? "", category.slug]
     .join(" ")
     .toLowerCase();
@@ -275,16 +272,18 @@ function categoryMatchesSearch(name: string, query: string) {
 function CategoryFilterDropdown({
   value,
   onChange,
+  categories,
 }: {
   value: string;
   onChange: (value: string) => void;
+  categories: Category[];
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
   const filteredCategories = useMemo(
-    () => FILTER_CATEGORIES.filter((category) => categoryMatchesSearch(category.name, search)),
-    [search],
+    () => categories.filter((category) => categoryMatchesSearch(category.name, search, categories)),
+    [categories, search],
   );
 
   const selectValue = (next: string) => {
@@ -310,7 +309,7 @@ function CategoryFilterDropdown({
             {value === "all" ? (
               <span className="text-xs">All categories</span>
             ) : (
-              <ProductCategoryLabel name={value} />
+              <ProductCategoryLabel name={value} categories={categories} />
             )}
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -338,7 +337,7 @@ function CategoryFilterDropdown({
                 className={cn("items-start rounded-sm py-2", value === category.name && "bg-accent")}
                 onClick={() => selectValue(category.name)}
               >
-                <ProductCategoryLabel name={category.name} />
+                <ProductCategoryLabel name={category.name} categories={categories} />
               </DropdownMenuItem>
             ))
           )}
@@ -476,15 +475,15 @@ function countAdvancedFilters(f: FilterState) {
   return n;
 }
 
-function applyFilters(rows: Product[], f: FilterState) {
+function applyFilters(rows: Product[], f: FilterState, categories: Category[]) {
   const q = f.search.toLowerCase();
   const min = f.priceMin ? Number(f.priceMin) : null;
   const max = f.priceMax ? Number(f.priceMax) : null;
 
   return rows.filter((p) => {
     if (q && !p.name.toLowerCase().includes(q) && !p.sku.toLowerCase().includes(q)) return false;
-    if (f.website === "on" && !isProductOnWebsite(p)) return false;
-    if (f.website === "off" && isProductOnWebsite(p)) return false;
+    if (f.website === "on" && !isProductOnWebsite(p, categories)) return false;
+    if (f.website === "off" && isProductOnWebsite(p, categories)) return false;
     if (f.status !== "all" && p.status !== f.status) return false;
     if (f.category !== "all" && p.category !== f.category) return false;
     if (f.brand !== "all" && p.brand !== f.brand) return false;
@@ -502,6 +501,7 @@ type Props = {
   onEdit: (product: Product) => void;
   onView: (product: Product) => void;
   products: Product[];
+  categories?: Category[];
   loading?: boolean;
   onProductsChanged?: () => void;
   className?: string;
@@ -511,12 +511,22 @@ export function ProductGrid({
   onEdit,
   onView,
   products,
+  categories = defaultCategoriesFlat,
   loading = false,
   onProductsChanged,
   className,
 }: Props) {
   const isDark = useIsDark();
   const canWrite = useAdminCanWrite();
+  const filterCategories = useMemo(
+    () => categories.filter((c) => c.active).sort((a, b) => a.name.localeCompare(b.name)),
+    [categories],
+  );
+  const categoryNames = useMemo(() => filterCategories.map((c) => c.name), [filterCategories]);
+  const priceCeiling = useMemo(() => {
+    if (products.length === 0) return DEFAULT_PRICE_CEILING;
+    return Math.ceil(Math.max(...products.map((p) => p.price)) / 1000) * 1000;
+  }, [products]);
   const brands = useMemo(() => {
     const set = new Set<string>();
     for (const p of products) if (p.brand) set.add(p.brand);
@@ -542,7 +552,7 @@ export function ProductGrid({
   const [archiveTargets, setArchiveTargets] = useState<Product[]>([]);
   const [page, setPage] = useState(0);
 
-  const filtered = useMemo(() => applyFilters(rowData, filters), [rowData, filters]);
+  const filtered = useMemo(() => applyFilters(rowData, filters, categories), [rowData, filters, categories]);
   const advancedCount = countAdvancedFilters(filters);
 
   const archiveProducts = useCallback(
@@ -589,25 +599,41 @@ export function ProductGrid({
               <DropdownMenuItem onClick={() => onEdit(data)}>
                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
               </DropdownMenuItem>
-              {!isProductOnWebsite(data) && data.status !== "archived" && (
+              {!isProductOnWebsite(data, categories) && data.status !== "archived" && (
                 <DropdownMenuItem
                   onClick={() => {
-                    setRowData((rows) =>
-                      rows.map((r) => (r.id === data.id ? publishProductToWebsite(r) : r)),
-                    );
-                    toast.success(`"${data.name}" published to website`);
+                    void (async () => {
+                      try {
+                        const updated = await publishProductToApi(data.id);
+                        setRowData((rows) =>
+                          rows.map((r) => (r.id === data.id ? { ...r, ...updated } : r)),
+                        );
+                        toast.success(`"${data.name}" published to website`);
+                        onProductsChanged?.();
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Publish failed");
+                      }
+                    })();
                   }}
                 >
                   <Globe className="mr-2 h-3.5 w-3.5" /> Publish to website
                 </DropdownMenuItem>
               )}
-              {isProductOnWebsite(data) && (
+              {isProductOnWebsite(data, categories) && (
                 <DropdownMenuItem
                   onClick={() => {
-                    setRowData((rows) =>
-                      rows.map((r) => (r.id === data.id ? removeProductFromWebsite(r) : r)),
-                    );
-                    toast.success(`"${data.name}" removed from website`);
+                    void (async () => {
+                      try {
+                        const updated = await unpublishProductFromApi(data.id);
+                        setRowData((rows) =>
+                          rows.map((r) => (r.id === data.id ? { ...r, ...updated } : r)),
+                        );
+                        toast.success(`"${data.name}" removed from website`);
+                        onProductsChanged?.();
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : "Unpublish failed");
+                      }
+                    })();
                   }}
                 >
                   <Globe className="mr-2 h-3.5 w-3.5" /> Remove from website
@@ -624,7 +650,7 @@ export function ProductGrid({
         </DropdownMenuContent>
       </DropdownMenu>
     ),
-    [onView, onEdit, openArchiveConfirm, canWrite],
+    [onView, onEdit, openArchiveConfirm, canWrite, categories, onProductsChanged],
   );
 
   const ProductActionCell = useCallback(
@@ -790,7 +816,7 @@ export function ProductGrid({
         width: 64,
         maxWidth: 72,
         sortable: true,
-        valueGetter: (p) => (p.data && isProductOnWebsite(p.data) ? 1 : 0),
+        valueGetter: (p) => (p.data && isProductOnWebsite(p.data, categories) ? 1 : 0),
         cellRenderer: (p: ICellRendererParams<Product>) =>
           p.data ? <WebsiteBadge product={p.data} /> : null,
         cellClass: "product-grid-icon-col",
@@ -811,9 +837,9 @@ export function ProductGrid({
         hide: !visibleCols.category,
         editable: canWrite && liveEdit.category,
         cellEditor: liveEdit.category ? "agSelectCellEditor" : undefined,
-        cellEditorParams: liveEdit.category ? { values: CATEGORY_NAMES } : undefined,
+        cellEditorParams: liveEdit.category ? { values: categoryNames } : undefined,
         cellRenderer: (p: ICellRendererParams<Product>) =>
-          p.data ? <ProductCategoryCell name={p.data.category} /> : null,
+          p.data ? <ProductCategoryCell name={p.data.category} categories={categories} /> : null,
         autoHeight: true,
       },
       {
@@ -856,7 +882,7 @@ export function ProductGrid({
         cellRenderer: ProductActionCell,
       },
     ],
-    [onView, visibleCols, liveEdit, ProductActionCell, brands, canWrite],
+    [onView, visibleCols, liveEdit, ProductActionCell, brands, canWrite, categories, categoryNames],
   );
 
   const onCellValueChanged = useCallback(
@@ -870,9 +896,28 @@ export function ProductGrid({
         toast.error(validation.message ?? "Slug already in use");
         return;
       }
-      toast.success(`Updated ${field} for ${e.data.sku}`);
+      if (!canWrite || !field) return;
+      void (async () => {
+        try {
+          const patch: Record<string, unknown> = {};
+          if (field === "slug") patch.slug = e.data.slug;
+          if (field === "sku") patch.sku = e.data.sku;
+          if (field === "price") patch.price = e.data.price;
+          if (field === "stock") patch.stock = e.data.stock;
+          if (field === "status") patch.status = e.data.status;
+          if (field === "category") patch.category = e.data.category;
+          if (field === "brand") patch.brand = e.data.brand;
+          if (field === "seoTitle") patch.seo_title = e.data.seoTitle;
+          if (Object.keys(patch).length === 0) return;
+          await updateCatalogProduct(e.data.id, patch);
+          toast.success(`Updated ${field} for ${e.data.sku}`);
+          onProductsChanged?.();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Update failed");
+        }
+      })();
     },
-    [],
+    [canWrite, onProductsChanged],
   );
 
   const pageStart = page * PAGE_SIZE + 1;
@@ -945,6 +990,7 @@ export function ProductGrid({
           <CategoryFilterDropdown
             value={filters.category}
             onChange={(category) => setFilters((f) => ({ ...f, category }))}
+            categories={filterCategories}
           />
         )}
         {visibleFilters.brand && (
@@ -984,6 +1030,7 @@ export function ProductGrid({
           <PriceRangeFilter
             valueMin={filters.priceMin}
             valueMax={filters.priceMax}
+            priceCeiling={priceCeiling}
             onChange={(priceMin, priceMax) =>
               setFilters((f) => ({ ...f, priceMin, priceMax }))
             }
@@ -1032,12 +1079,23 @@ export function ProductGrid({
           <Button
             size="sm"
             onClick={() => {
-              const ids = new Set(selected.map((s) => s.id));
-              setRowData((rows) =>
-                rows.map((r) => (ids.has(r.id) ? publishProductToWebsite(r) : r)),
-              );
-              toast.success(`Published ${selected.length} product${selected.length > 1 ? "s" : ""} to website`);
-              setSelected([]);
+              void (async () => {
+                try {
+                  await Promise.all(selected.map((p) => publishProductToApi(p.id)));
+                  setRowData((rows) =>
+                    rows.map((r) =>
+                      selected.some((s) => s.id === r.id)
+                        ? publishProductToWebsite(r)
+                        : r,
+                    ),
+                  );
+                  toast.success(`Published ${selected.length} product${selected.length > 1 ? "s" : ""} to website`);
+                  setSelected([]);
+                  onProductsChanged?.();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Bulk publish failed");
+                }
+              })();
             }}
           >
             <Globe className="mr-1.5 h-3.5 w-3.5" />
@@ -1047,12 +1105,23 @@ export function ProductGrid({
             variant="secondary"
             size="sm"
             onClick={() => {
-              const ids = new Set(selected.map((s) => s.id));
-              setRowData((rows) =>
-                rows.map((r) => (ids.has(r.id) ? removeProductFromWebsite(r) : r)),
-              );
-              toast.success(`Removed ${selected.length} product${selected.length > 1 ? "s" : ""} from website`);
-              setSelected([]);
+              void (async () => {
+                try {
+                  await Promise.all(selected.map((p) => unpublishProductFromApi(p.id)));
+                  setRowData((rows) =>
+                    rows.map((r) =>
+                      selected.some((s) => s.id === r.id)
+                        ? removeProductFromWebsite(r)
+                        : r,
+                    ),
+                  );
+                  toast.success(`Removed ${selected.length} product${selected.length > 1 ? "s" : ""} from website`);
+                  setSelected([]);
+                  onProductsChanged?.();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Bulk unpublish failed");
+                }
+              })();
             }}
           >
             Remove from website

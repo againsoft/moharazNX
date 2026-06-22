@@ -68,6 +68,22 @@ export function useCatalogAttributeProfiles(): UseCatalogAttributeProfilesState 
   return { profiles, groups, attributes, total, loading, error, refetch };
 }
 
+export async function fetchAttributeProfile(profileId: string): Promise<{
+  profile: AttributeProfile;
+  groups: AttributeGroup[];
+  attributes: AttributeSpec[];
+}> {
+  const res = await apiFetch<ApiAttributeProfileResponse>(
+    `/api/v1/catalog/attribute-profiles/${profileId}`,
+  );
+  const profile = apiProfileToProfile(res.data);
+  const groups = res.data.groups.map(apiGroupToGroup);
+  const attributes = res.data.groups.flatMap((group) =>
+    (group.attributes ?? []).map(apiAttributeToSpec),
+  );
+  return { profile, groups, attributes };
+}
+
 export async function patchAttributeProfile(
   id: string,
   patch: Partial<AttributeProfile>,

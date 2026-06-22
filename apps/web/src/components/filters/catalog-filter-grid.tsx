@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ChevronDown,
@@ -26,8 +26,15 @@ import {
   type FilterDisplayType,
   type FilterSource,
 } from "@/lib/mock-data/catalog-filters";
-import { useCatalogFilterStore } from "@/lib/store/catalog-filter-store";
-import { useAttributeProfileStore } from "@/lib/store/attribute-profile-store";
+import type { AttributeSpec } from "@/lib/mock-data/attribute-profiles";
+import {
+  bulkPatchCatalogFilters,
+  createCatalogFilter,
+  deleteCatalogFilters,
+  patchCatalogFilter,
+  reorderCatalogFilters,
+} from "@/lib/api/use-catalog-filters";
+import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +46,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { CatalogFilterFormDialog } from "@/components/filters/catalog-filter-form-dialog";
 
 type FilterState = { search: string; displayType: string };
 const DEFAULT_FILTERS: FilterState = { search: "", displayType: "all" };
@@ -61,33 +67,35 @@ const DISPLAY_TYPE_COLORS: Record<FilterDisplayType, string> = {
   dynamic: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
 };
 
-type Props = { className?: string; addTrigger?: number };
+type Props = {
+  className?: string;
+  filters: CatalogFacetFilter[];
+  filterableAttributes: AttributeSpec[];
+  loading?: boolean;
+  onFiltersChanged?: () => void;
+  onEdit?: (filter: CatalogFacetFilter) => void;
+  onCreate?: () => void;
+};
 
-export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
-  const catalogFilters = useCatalogFilterStore((s) => s.filters);
-  const getDisplayOrder = useCatalogFilterStore((s) => s.getDisplayOrder);
-  const upsertFilter = useCatalogFilterStore((s) => s.upsertFilter);
-  const patchFilter = useCatalogFilterStore((s) => s.patchFilter);
-  const deleteFilters = useCatalogFilterStore((s) => s.deleteFilters);
+export function CatalogFilterGrid({
+  className,
+  filters: catalogFilters,
+  filterableAttributes,
+  loading: _loading = false,
+  onFiltersChanged,
+  onEdit: onEditProp,
+  onCreate,
+}: Props) {
+  const canWrite = useAdminCanWrite();
 
-  const storeAttributes = useAttributeProfileStore((s) => s.attributes);
+  const filterableAttrs = filterableAttributes;
 
-  // All filterable attributes from the attribute store
-  const filterableAttrs = useMemo(
-    () => storeAttributes.filter((a) => a.isFilterable),
-    [storeAttributes],
-  );
-
-  // Filterable attributes that don't have a filter yet
   const suggestedAttrs = useMemo(() => {
     const linkedIds = new Set(catalogFilters.map((f) => f.attributeId).filter(Boolean));
     return filterableAttrs.filter((a) => !linkedIds.has(a.id));
   }, [filterableAttrs, catalogFilters]);
 
   const [toolbarFilters, setToolbarFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<"create" | "edit">("create");
-  const [editFilter, setEditFilter] = useState<CatalogFacetFilter | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["builtin", "attribute"]));
   const [expandedFilters, setExpandedFilters] = useState<Set<string>>(new Set());
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -96,7 +104,10 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
 
-  const ordered = useMemo(() => getDisplayOrder(), [catalogFilters, getDisplayOrder]);
+  const ordered = useMemo(
+    () => [...catalogFilters].sort((a, b) => a.sortOrder - b.sortOrder),
+    [catalogFilters],
+  );
   const filtered = useMemo(() => applyFilters(ordered, toolbarFilters), [ordered, toolbarFilters]);
 
   const builtIn = filtered.filter((f) => f.source === "built_in");
@@ -108,13 +119,32 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
   const toggleFilter = (id: string) =>
     setExpandedFilters((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const openCreate = useCallback(() => { setFormMode("create"); setEditFilter(null); setFormOpen(true); }, []);
-  const openEdit = useCallback((f: CatalogFacetFilter) => { setFormMode("edit"); setEditFilter(f); setFormOpen(true); }, []);
+  const openEdit = useCallback(
+    (f: CatalogFacetFilter) => {
+      onEditProp?.(f);
+    },
+    [onEditProp],
+  );
 
-  useEffect(() => { if (addTrigger > 0) openCreate(); }, [addTrigger, openCreate]);
+  const toggleActive = async (f: CatalogFacetFilter) => {
+    if (!canWrite) return;
+    try {
+      await patchCatalogFilter(f.id, { isActive: !f.isActive });
+      onFiltersChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    }
+  };
 
-  const toggleActive = (f: CatalogFacetFilter) => patchFilter(f.id, { isActive: !f.isActive });
-  const toggleStorefront = (f: CatalogFacetFilter) => patchFilter(f.id, { storefrontVisible: !f.storefrontVisible });
+  const toggleStorefront = async (f: CatalogFacetFilter) => {
+    if (!canWrite) return;
+    try {
+      await patchCatalogFilter(f.id, { storefrontVisible: !f.storefrontVisible });
+      onFiltersChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    }
+  };
 
   const openDeleteConfirm = (targets: CatalogFacetFilter[]) => {
     const deletable = targets.filter((t) => !t.isSystem);
@@ -123,43 +153,47 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
     setDeleteOpen(true);
   };
 
-  const confirmDelete = () => {
-    deleteFilters(deleteTargets.map((t) => t.id));
-    toast.success(`Deleted ${deleteTargets.length} filter${deleteTargets.length > 1 ? "s" : ""}`);
-    setDeleteOpen(false);
-    setDeleteTargets([]);
-    setSelected([]);
+  const confirmDelete = async () => {
+    try {
+      await deleteCatalogFilters(deleteTargets.map((t) => t.id));
+      toast.success(`Deleted ${deleteTargets.length} filter${deleteTargets.length > 1 ? "s" : ""}`);
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setSelected([]);
+      onFiltersChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
   };
 
-  const handleSave = (data: Partial<CatalogFacetFilter>) => {
-    if (formMode === "create") upsertFilter(data);
-    else if (editFilter) upsertFilter({ id: editFilter.id, ...data });
-  };
-
-  // Auto-create a filter from a filterable attribute
-  const createFromAttr = (attr: typeof filterableAttrs[0]) => {
+  const createFromAttr = async (attr: AttributeSpec) => {
+    if (!canWrite) return;
     const isNumeric = attr.fieldType === "number";
     const hasValues = (attr.predefinedValues ?? []).length > 0;
     const displayType: FilterDisplayType = isNumeric ? "range" : hasValues ? "multi_select" : "dynamic";
-    upsertFilter({
-      name: attr.name,
-      paramKey: attr.code.replace(/[^a-z0-9]/g, "_").toLowerCase(),
-      displayType,
-      source: "attribute",
-      attributeId: attr.id,
-      attributeName: attr.name,
-      isActive: true,
-      storefrontVisible: true,
-      categoryScope: "All categories",
-      valueCount: attr.predefinedValues?.length ?? 0,
-      urlExample: `?${attr.code}=`,
-      updatedAt: new Date().toISOString().slice(0, 10),
-    });
-    toast.success(`Filter created for ${attr.name}`);
+    const paramKey = attr.code.replace(/[^a-z0-9]/g, "_").toLowerCase();
+    try {
+      await createCatalogFilter({
+        name: attr.name,
+        paramKey,
+        displayType,
+        source: "attribute",
+        attributeId: attr.id,
+        attributeName: attr.name,
+        isActive: true,
+        storefrontVisible: true,
+        categoryScope: "All categories",
+        urlExample: `?${paramKey}=`,
+      });
+      toast.success(`Filter created for ${attr.name}`);
+      onFiltersChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Create failed");
+    }
   };
 
-  const handleDrop = (targetId: string) => {
-    if (!dragId || dragId === targetId) return;
+  const handleDrop = async (targetId: string) => {
+    if (!canWrite || !dragId || dragId === targetId) return;
     const ids = ordered.map((f) => f.id);
     const from = ids.indexOf(dragId);
     const to = ids.indexOf(targetId);
@@ -167,10 +201,13 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
     const next = [...ids];
     next.splice(from, 1);
     next.splice(to, 0, dragId);
-    // reorder via store
-    const store = useCatalogFilterStore.getState();
-    store.reorderFilters(next);
-    toast.success("Filter order updated");
+    try {
+      await reorderCatalogFilters(next);
+      toast.success("Filter order updated");
+      onFiltersChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Reorder failed");
+    }
     setDragId(null);
     setOverId(null);
   };
@@ -178,7 +215,7 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
   const FilterRow = ({ f }: { f: CatalogFacetFilter }) => {
     const expanded = expandedFilters.has(f.id);
     const chips = f.source === "attribute"
-      ? (storeAttributes.find((a) => a.id === f.attributeId)?.predefinedValues ?? [])
+      ? (filterableAttributes.find((a) => a.id === f.attributeId)?.predefinedValues ?? [])
       : [];
     return (
       <div
@@ -189,8 +226,8 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
         className={cn(overId === f.id && dragId !== f.id && "rounded-md ring-2 ring-primary/30")}
       >
         <div
-          draggable
-          onDragStart={() => setDragId(f.id)}
+          draggable={canWrite}
+          onDragStart={() => canWrite && setDragId(f.id)}
           onDragEnd={() => { setDragId(null); setOverId(null); }}
           className={cn(
             "flex cursor-grab items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-muted/40 active:cursor-grabbing",
@@ -200,6 +237,7 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
         >
           <input
             type="checkbox"
+            disabled={!canWrite}
             checked={selected.some((s) => s.id === f.id)}
             onChange={(e) => setSelected((prev) => e.target.checked ? [...prev, f] : prev.filter((s) => s.id !== f.id))}
             className="shrink-0 rounded border-input"
@@ -247,7 +285,7 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
               <DropdownMenuItem onClick={() => openEdit(f)}>
                 <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
               </DropdownMenuItem>
-              {!f.isSystem && (
+              {canWrite && !f.isSystem && (
                 <DropdownMenuItem onClick={() => openDeleteConfirm([f])} className="text-destructive">
                   <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                 </DropdownMenuItem>
@@ -295,8 +333,9 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
             )}
             <button
               type="button"
-              onClick={openCreate}
-              className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+              onClick={onCreate}
+              disabled={!canWrite || !onCreate}
+              className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted/40 hover:text-foreground disabled:opacity-50"
             >
               <Plus className="h-3 w-3" />
               Add {source === "built_in" ? "built-in" : "attribute"} filter
@@ -331,11 +370,35 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
           <Filter className="mr-1.5 h-3.5 w-3.5" />
           Reset
         </Button>
-        {selected.length > 0 && (
+        {selected.length > 0 && canWrite && (
           <>
             <span className="text-xs text-muted-foreground">{selected.length} selected</span>
-            <Button variant="outline" size="sm" onClick={() => { selected.forEach((f) => patchFilter(f.id, { isActive: true })); setSelected([]); toast.success("Activated"); }}>Activate</Button>
-            <Button variant="outline" size="sm" onClick={() => { selected.forEach((f) => patchFilter(f.id, { isActive: false })); setSelected([]); toast.success("Deactivated"); }}>Deactivate</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void bulkPatchCatalogFilters(selected, { isActive: true }).then(() => {
+                  setSelected([]);
+                  toast.success("Activated");
+                  onFiltersChanged?.();
+                });
+              }}
+            >
+              Activate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                void bulkPatchCatalogFilters(selected, { isActive: false }).then(() => {
+                  setSelected([]);
+                  toast.success("Deactivated");
+                  onFiltersChanged?.();
+                });
+              }}
+            >
+              Deactivate
+            </Button>
             <Button variant="outline" size="sm" className="text-destructive" onClick={() => openDeleteConfirm(selected)}>
               <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
             </Button>
@@ -373,7 +436,7 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
         </div>
 
         {/* Suggested filters from filterable attributes */}
-        {suggestedAttrs.length > 0 && (
+        {suggestedAttrs.length > 0 && canWrite && (
           <div className="mt-4 rounded-lg border border-dashed border-input p-3">
             <div className="mb-2 flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-amber-500" />
@@ -393,7 +456,7 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
                     </span>
                     <button
                       type="button"
-                      onClick={() => createFromAttr(attr)}
+                      onClick={() => void createFromAttr(attr)}
                       className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-primary/10"
                     >
                       + Add
@@ -405,15 +468,6 @@ export function CatalogFilterGrid({ className, addTrigger = 0 }: Props) {
           </div>
         )}
       </div>
-
-      <CatalogFilterFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        mode={formMode}
-        filter={editFilter}
-        onSave={handleSave}
-        onLiveChange={(data) => patchFilter(data.id, data)}
-      />
 
       <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
         <Dialog.Portal>

@@ -5,12 +5,20 @@ import type { Product } from "@/lib/mock-data/products";
 import { apiFetch } from "@/lib/api/client";
 import {
   apiProductToProduct,
+  fetchCatalogProductDetail,
   productToApiPayload,
   productToApiUpdatePayload,
+  replaceProductMedia,
+  replaceProductSpecs,
+  replaceProductVariants,
+  fetchProductSpecs,
+  type ProductSpecs,
+  type ApiProductDetailResponse,
   type ApiProductListResponse,
-  type ApiProductResponse,
   type CreateCatalogProductInput,
+  type ProductDetail,
   type UpdateCatalogProductInput,
+  type VariantUpsertInput,
 } from "@/lib/api/catalog-products";
 
 type UseCatalogProductsState = {
@@ -54,27 +62,30 @@ export function useCatalogProducts(): UseCatalogProductsState {
 }
 
 export async function fetchCatalogProduct(id: string): Promise<Product> {
-  const res = await apiFetch<ApiProductResponse>(`/api/v1/catalog/products/${id}`);
-  return apiProductToProduct(res.data);
+  const detail = await fetchCatalogProductDetail(id);
+  return detail;
 }
 
-export async function createCatalogProduct(input: CreateCatalogProductInput): Promise<Product> {
-  const res = await apiFetch<ApiProductResponse>("/api/v1/catalog/products", {
+export { fetchCatalogProductDetail, fetchProductSpecs, replaceProductMedia, replaceProductSpecs, replaceProductVariants };
+export type { ProductDetail, ProductSpecs, VariantUpsertInput };
+
+export async function createCatalogProduct(input: CreateCatalogProductInput): Promise<ProductDetail> {
+  const res = await apiFetch<ApiProductDetailResponse>("/api/v1/catalog/products", {
     method: "POST",
     body: JSON.stringify(productToApiPayload(input)),
   });
-  return apiProductToProduct(res.data);
+  return fetchCatalogProductDetail(res.data.id);
 }
 
 export async function updateCatalogProduct(
   id: string,
   input: UpdateCatalogProductInput,
-): Promise<Product> {
-  const res = await apiFetch<ApiProductResponse>(`/api/v1/catalog/products/${id}`, {
+): Promise<ProductDetail> {
+  const res = await apiFetch<ApiProductDetailResponse>(`/api/v1/catalog/products/${id}`, {
     method: "PATCH",
     body: JSON.stringify(productToApiUpdatePayload(input)),
   });
-  return apiProductToProduct(res.data);
+  return fetchCatalogProductDetail(res.data.id);
 }
 
 export async function archiveCatalogProducts(ids: string[]): Promise<void> {
@@ -87,4 +98,12 @@ export async function archiveCatalogProducts(ids: string[]): Promise<void> {
 
 export async function deleteCatalogProduct(id: string): Promise<void> {
   await apiFetch<void>(`/api/v1/catalog/products/${id}`, { method: "DELETE" });
+}
+
+export async function publishProductToApi(id: string): Promise<ProductDetail> {
+  return updateCatalogProduct(id, { status: "published", visibility: "public" });
+}
+
+export async function unpublishProductFromApi(id: string): Promise<ProductDetail> {
+  return updateCatalogProduct(id, { status: "draft", visibility: "private" });
 }

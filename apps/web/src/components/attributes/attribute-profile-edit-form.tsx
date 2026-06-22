@@ -11,7 +11,8 @@ import {
   type BulkAttributeFormState,
   type BulkAttributeGroupRow,
 } from "@/lib/mock-data/attribute-profiles";
-import { useAttributeProfileStore } from "@/lib/store/attribute-profile-store";
+import { saveAttributeProfileBulk } from "@/lib/api/use-catalog-attribute-profiles";
+import { useCatalogAttributeProfile } from "@/lib/api/use-catalog-attribute-profile";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,11 +27,8 @@ type Props = {
 
 export function AttributeProfileEditForm({ profileId }: Props) {
   const router = useRouter();
-  const profile = useAttributeProfileStore((s) => s.getProfileById(profileId));
-  const groups = useAttributeProfileStore((s) => s.groups);
-  const attributes = useAttributeProfileStore((s) => s.attributes);
-  const saveProfileBulk = useAttributeProfileStore((s) => s.saveProfileBulk);
-
+  const { profile, groups, attributes, loading, error } = useCatalogAttributeProfile(profileId);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<BulkAttributeFormState>({ profileName: "", groups: [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [dragGroupKey, setDragGroupKey] = useState<string | null>(null);
@@ -78,7 +76,7 @@ export function AttributeProfileEditForm({ profileId }: Props) {
     return Object.keys(next).length === 0;
   }, [form.profileName]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!validate()) {
       toast.error("Profile name is required.");
       return;
@@ -91,23 +89,40 @@ export function AttributeProfileEditForm({ profileId }: Props) {
         name: g.name.trim(),
         attributes: g.attributes
           .filter((a) => a.name.trim())
-          .map((a) => ({ id: a.id, name: a.name.trim(), filterable: a.filterable, predefinedValues: a.predefinedValues })),
+          .map((a) => ({
+            id: a.id,
+            name: a.name.trim(),
+            filterable: a.filterable,
+            predefinedValues: a.predefinedValues,
+          })),
       }));
 
-    saveProfileBulk({
-      profileId,
-      profileName: form.profileName.trim(),
-      groups: payloadGroups,
-    });
-
-    toast.success("Attribute profile saved");
-    router.push("/catalog/attributes");
+    setSaving(true);
+    try {
+      await saveAttributeProfileBulk({
+        profileId,
+        profileName: form.profileName.trim(),
+        groups: payloadGroups,
+      });
+      toast.success("Attribute profile saved");
+      router.push("/catalog/attributes");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!profile) {
+  if (loading) {
+    return (
+      <p className="text-sm text-muted-foreground">Loading attribute profile from API…</p>
+    );
+  }
+
+  if (error || !profile) {
     return (
       <div className="rounded-lg border border-dashed border-input p-8 text-center">
-        <p className="text-sm font-medium">Attribute profile not found</p>
+        <p className="text-sm font-medium">{error ?? "Attribute profile not found"}</p>
         <Button variant="ghost" size="sm" asChild className="mt-2">
           <Link href="/catalog/attributes">Back to attributes</Link>
         </Button>
@@ -133,9 +148,9 @@ export function AttributeProfileEditForm({ profileId }: Props) {
           <Button variant="outline" size="sm" asChild>
             <Link href="/catalog/attributes">Cancel</Link>
           </Button>
-          <Button size="sm" onClick={handleSave}>
+          <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
             <Save className="mr-1.5 h-3.5 w-3.5" />
-            Save
+            {saving ? "Saving…" : "Save"}
           </Button>
         </div>
       </div>

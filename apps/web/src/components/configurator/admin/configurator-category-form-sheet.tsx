@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FolderTree } from "lucide-react";
-import { toast } from "sonner";
 import { CONFIGURATOR_STATUSES, STATUS_LABELS, type ConfiguratorCategory } from "@/lib/configurator/types";
-import { useConfiguratorCategoryStore } from "@/lib/store/configurator-category-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,16 +11,34 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+type SaveData = {
+  profileId: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  sortOrder: number;
+  isRequired: boolean;
+  selectionMode: ConfiguratorCategory["selectionMode"];
+  status: ConfiguratorCategory["status"];
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   category?: ConfiguratorCategory | null;
   defaultProfileId: string;
   profileName: string;
+  onSave: (data: SaveData) => void;
 };
 
-export function ConfiguratorCategoryFormSheet({ open, onOpenChange, category, defaultProfileId, profileName }: Props) {
-  const upsert = useConfiguratorCategoryStore((s) => s.upsert);
+export function ConfiguratorCategoryFormSheet({
+  open,
+  onOpenChange,
+  category,
+  defaultProfileId,
+  profileName,
+  onSave,
+}: Props) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -43,11 +59,9 @@ export function ConfiguratorCategoryFormSheet({ open, onOpenChange, category, de
   }, [open, category]);
 
   const handleSave = () => {
-    if (!name.trim()) { toast.error("Name required"); return; }
-    upsert({
-      id: category?.id,
+    if (!name.trim()) return;
+    onSave({
       profileId: category?.profileId ?? defaultProfileId,
-      profileName: category?.profileName ?? profileName,
       name: name.trim(),
       slug: slug.trim() || undefined,
       description: description.trim() || undefined,
@@ -56,8 +70,6 @@ export function ConfiguratorCategoryFormSheet({ open, onOpenChange, category, de
       selectionMode,
       status,
     });
-    toast.success(category ? "Category updated" : "Category created");
-    onOpenChange(false);
   };
 
   return (

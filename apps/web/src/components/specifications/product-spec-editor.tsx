@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Search, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { FIELD_TYPE_LABELS, type AttributeSpec } from "@/lib/mock-data/attribute-profiles";
-import { useAttributeProfileStore } from "@/lib/store/attribute-profile-store";
+import { useCatalogAttributeProfiles } from "@/lib/api/use-catalog-attribute-profiles";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,40 +13,55 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-const DEMO_VALUES: Record<string, string> = {
-  cpu_brand: "Intel",
-  cpu_model: "Core i7-13700H",
-  cpu_generation: "13th Gen",
-  cpu_core: "14",
-  display_size: '15.6"',
-  display_type: "IPS",
-  resolution: "1920×1080",
-  refresh_rate: "144Hz",
-  ram: "16GB",
-  ram_type: "DDR5",
-  storage_type: "NVMe SSD",
-  storage_capacity: "512GB",
+export type ProductSpecsDraft = {
+  profileId: string;
+  valuesByAttributeId: Record<string, string>;
 };
 
-export function ProductSpecEditor() {
-  const profiles = useAttributeProfileStore((s) => s.profiles);
-  const getGroupsForProfile = useAttributeProfileStore((s) => s.getGroupsForProfile);
-  const attributes = useAttributeProfileStore((s) => s.attributes);
+type Props = {
+  productId?: string;
+  initialProfileId?: string | null;
+  initialValues?: Record<string, string>;
+  onChange?: (draft: ProductSpecsDraft) => void;
+};
 
-  const [profileId, setProfileId] = useState(profiles[0]?.id ?? "");
+export function ProductSpecEditor({
+  productId,
+  initialProfileId,
+  initialValues,
+  onChange,
+}: Props) {
+  const { profiles, groups, attributes, loading } = useCatalogAttributeProfiles();
+  const [profileId, setProfileId] = useState(initialProfileId ?? profiles[0]?.id ?? "");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [search, setSearch] = useState("");
-  const [values, setValues] = useState<Record<string, string>>(() => ({ ...DEMO_VALUES }));
+  const [values, setValues] = useState<Record<string, string>>(initialValues ?? {});
 
-  const groups = useMemo(
-    () => (profileId ? getGroupsForProfile(profileId) : []),
-    [profileId, getGroupsForProfile],
+  useEffect(() => {
+    if (initialProfileId) setProfileId(initialProfileId);
+  }, [initialProfileId]);
+
+  useEffect(() => {
+    if (initialValues) setValues(initialValues);
+  }, [initialValues]);
+
+  useEffect(() => {
+    if (!profileId && profiles[0]?.id) setProfileId(profiles[0].id);
+  }, [profileId, profiles]);
+
+  useEffect(() => {
+    onChange?.({ profileId, valuesByAttributeId: values });
+  }, [profileId, values, onChange]);
+
+  const profileGroups = useMemo(
+    () => (profileId ? groups.filter((g) => g.profileId === profileId) : []),
+    [profileId, groups],
   );
 
   const fieldsByGroup = useMemo(() => {
     const q = search.toLowerCase().trim();
     const map = new Map<string, AttributeSpec[]>();
-    for (const g of groups) {
+    for (const g of profileGroups) {
       const fields = attributes
         .filter((a) => a.groupId === g.id)
         .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -54,33 +69,42 @@ export function ProductSpecEditor() {
       if (fields.length) map.set(g.id, fields);
     }
     return map;
-  }, [groups, attributes, search]);
+  }, [profileGroups, attributes, search]);
 
   const toggleGroup = (id: string) => {
     setCollapsed((c) => ({ ...c, [id]: !c[id] }));
   };
 
-  const setValue = (code: string, val: string) => {
-    setValues((v) => ({ ...v, [code]: val }));
+  const setValue = (attributeId: string, val: string) => {
+    setValues((v) => ({ ...v, [attributeId]: val }));
   };
 
   const fillWithAi = () => {
     const next = { ...values };
-    for (const g of groups) {
+    for (const g of profileGroups) {
       for (const a of attributes.filter((x) => x.groupId === g.id)) {
-        if (!next[a.code]?.trim()) {
-          next[a.code] = DEMO_VALUES[a.code] ?? `Sample ${a.name}`;
+        if (!next[a.id]?.trim()) {
+          next[a.id] = a.predefinedValues?.[0] ?? `Sample ${a.name}`;
         }
       }
     }
     setValues(next);
-    toast.success("AI filled empty specification fields");
+    toast.success("Filled empty specification fields");
   };
 
   const profile = profiles.find((p) => p.id === profileId);
 
+  if (loading) {
+    return <p className="text-sm text-muted-foreground">Loading specification profiles…</p>;
+  }
+
   return (
     <div className="space-y-4">
+      {productId && (
+        <p className="text-[11px] text-muted-foreground">
+          Specifications save with the product (product ID: {productId.slice(0, 8)}…)
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-input bg-muted/30 p-4">
         <div className="min-w-[200px] flex-1">
           <Label>Specification profile</Label>
@@ -112,14 +136,16 @@ export function ProductSpecEditor() {
           />
         </div>
         <Button type="button" variant="outline" size="sm" onClick={fillWithAi}>
-          <Sparkles className="mr-1.5 h-3.5 w-3.5" /> AI fill empty
+          <Sparkles className="mr-1.5 h-3.5 w-3.5" /> Fill empty
         </Button>
       </div>
 
-      {groups.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Select a profile with groups and fields.</p>
+      {profileGroups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Select a profile with groups and fields, or create one under Catalog → Attributes.
+        </p>
       ) : (
-        groups.map((g) => {
+        profileGroups.map((g) => {
           const fields = fieldsByGroup.get(g.id);
           if (!fields?.length && search) return null;
           const isOpen = !collapsed[g.id];
@@ -147,8 +173,8 @@ export function ProductSpecEditor() {
                     <SpecFieldInput
                       key={f.id}
                       field={f}
-                      value={values[f.code] ?? ""}
-                      onChange={(v) => setValue(f.code, v)}
+                      value={values[f.id] ?? ""}
+                      onChange={(v) => setValue(f.id, v)}
                     />
                   ))}
                 </div>
@@ -157,21 +183,6 @@ export function ProductSpecEditor() {
           );
         })
       )}
-
-      <div className="rounded-lg border border-dashed border-input p-4">
-        <p className="text-xs font-semibold text-muted-foreground">Product-only customization</p>
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          Add groups/fields that apply only to this product — profile template stays unchanged
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={() => toast.info("Add product-only group (mock)")}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add group
-          </Button>
-          <Button type="button" variant="outline" size="sm" onClick={() => toast.info("Add product-only field (mock)")}>
-            <Plus className="mr-1 h-3.5 w-3.5" /> Add field
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -210,14 +221,15 @@ function SpecFieldInput({
   }
 
   if (field.fieldType === "dropdown" || field.fieldType === "radio") {
+    const options = field.predefinedValues?.length ? field.predefinedValues : ["—"];
     return (
       <div>
         {label}
         <Select value={value} onChange={(e) => onChange(e.target.value)} className="text-sm">
           <option value="">Select…</option>
-          <option value="Intel">Intel</option>
-          <option value="AMD">AMD</option>
-          <option value="Apple">Apple</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
         </Select>
       </div>
     );

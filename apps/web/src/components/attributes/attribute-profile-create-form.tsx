@@ -5,30 +5,36 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Save } from "lucide-react";
 import { toast } from "sonner";
-import { useAttributeProfileStore } from "@/lib/store/attribute-profile-store";
+import { saveAttributeProfileBulk } from "@/lib/api/use-catalog-attribute-profiles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export function AttributeProfileCreateForm() {
   const router = useRouter();
-  const saveProfileBulk = useAttributeProfileStore((s) => s.saveProfileBulk);
   const [profileName, setProfileName] = useState("");
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!profileName.trim()) {
       setError("Profile name is required.");
       toast.error("Enter a profile name first.");
       return;
     }
 
-    const id = saveProfileBulk({
-      profileName: profileName.trim(),
-      groups: [],
-    });
-
-    toast.success("Attribute profile created — now add groups and attributes");
-    router.push(`/catalog/attributes/${id}`);
+    setSaving(true);
+    try {
+      const profile = await saveAttributeProfileBulk({
+        profileName: profileName.trim(),
+        groups: [],
+      });
+      toast.success("Attribute profile created — now add groups and attributes");
+      router.push(`/catalog/attributes/${profile.id}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -76,9 +82,9 @@ export function AttributeProfileCreateForm() {
         </p>
 
         <div className="mt-5 flex gap-2">
-          <Button size="sm" onClick={handleCreate}>
+          <Button size="sm" onClick={() => void handleCreate()} disabled={saving}>
             <Save className="mr-1.5 h-3.5 w-3.5" />
-            Create profile
+            {saving ? "Creating…" : "Create profile"}
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/catalog/attributes">Cancel</Link>

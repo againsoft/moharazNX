@@ -10,7 +10,6 @@ import {
   STATUS_LABELS,
   type ConfiguratorProfile,
 } from "@/lib/configurator/types";
-import { useConfiguratorProfileStore } from "@/lib/store/configurator-profile-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,14 +18,23 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+type SavePayload = {
+  name: string;
+  slug?: string;
+  profileType: ConfiguratorProfile["profileType"];
+  status: ConfiguratorProfile["status"];
+  description?: string;
+  isDefault: boolean;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   profile?: ConfiguratorProfile | null;
+  onSave: (data: SavePayload) => void | Promise<void>;
 };
 
-export function ConfiguratorProfileFormSheet({ open, onOpenChange, profile }: Props) {
-  const upsert = useConfiguratorProfileStore((s) => s.upsert);
+export function ConfiguratorProfileFormSheet({ open, onOpenChange, profile, onSave }: Props) {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -49,8 +57,7 @@ export function ConfiguratorProfileFormSheet({ open, onOpenChange, profile }: Pr
       toast.error("Name is required");
       return;
     }
-    upsert({
-      id: profile?.id,
+    void onSave({
       name: name.trim(),
       slug: slug.trim() || undefined,
       description: description.trim() || undefined,
@@ -58,8 +65,6 @@ export function ConfiguratorProfileFormSheet({ open, onOpenChange, profile }: Pr
       status,
       isDefault,
     });
-    toast.success(profile ? "Profile updated" : "Profile created");
-    onOpenChange(false);
   };
 
   return (

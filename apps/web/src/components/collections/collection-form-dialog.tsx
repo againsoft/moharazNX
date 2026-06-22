@@ -97,7 +97,6 @@ export function CollectionFormDialog({
       scheduleEnd: String(fd.get("scheduleEnd") ?? "") || undefined,
       heroImageUrl,
     });
-    toast.success(mode === "create" ? "Collection created (mock)" : "Collection updated (mock)");
     onOpenChange(false);
   };
 

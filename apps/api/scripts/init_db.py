@@ -2,7 +2,7 @@
 """Create tables and seed catalog data for MoharazNX."""
 
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 from typing import Dict, Optional
 
 from sqlalchemy import text
@@ -15,8 +15,16 @@ from app.models.catalog_attribute import CatalogAttribute
 from app.models.catalog_attribute_group import CatalogAttributeGroup
 from app.models.catalog_attribute_profile import CatalogAttributeProfile
 from app.models.catalog_brand import CatalogBrand
+from app.models.catalog_collection import CatalogCollection
+from app.models.configurator_build import ConfiguratorBuild
+from app.models.configurator_category import ConfiguratorCategory
+from app.models.configurator_profile import ConfiguratorProfile
+from app.models.configurator_template import ConfiguratorTemplate, dump_components
+from app.models.catalog_filter import CatalogFilter
 from app.models.catalog_category import CatalogCategory
 from app.models.catalog_product import CatalogProduct
+from app.models.catalog_product_attribute_value import CatalogProductAttributeValue
+from app.models.catalog_product_media import CatalogProductMedia
 from app.models.marketing_audience import MarketingAudience
 from app.models.marketing_campaign import MarketingCampaign
 from app.models.marketing_journey import MarketingJourney
@@ -62,6 +70,12 @@ from scripts.seed_data import (
     BRAND_SEED,
     CATALOG_SEED,
     CATEGORY_SEED,
+    COLLECTION_SEED,
+    CONFIGURATOR_BUILD_SEED,
+    CONFIGURATOR_CATEGORY_SEED,
+    CONFIGURATOR_PROFILE_SEED,
+    CONFIGURATOR_TEMPLATE_SEED,
+    FILTER_SEED,
     MEDIA_SEED,
     WAREHOUSE_SEED,
 )
@@ -146,6 +160,233 @@ def seed_brands(db) -> int:
         db.add(CatalogBrand(**item))
         inserted += 1
     if inserted:
+        db.commit()
+    return inserted
+
+
+def _parse_optional_date(value: Optional[str | date]) -> Optional[date]:
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(value)
+
+
+def seed_collections(db) -> int:
+    existing_slugs = {
+        slug for slug, in db.query(CatalogCollection.slug).all()
+    }
+    inserted = 0
+    for item in COLLECTION_SEED:
+        if item["slug"] in existing_slugs:
+            continue
+        payload = dict(item)
+        payload["schedule_start"] = _parse_optional_date(payload.get("schedule_start"))
+        payload["schedule_end"] = _parse_optional_date(payload.get("schedule_end"))
+        db.add(CatalogCollection(**payload))
+        inserted += 1
+    if inserted:
+        db.commit()
+    return inserted
+
+
+def seed_filters(db) -> int:
+    existing_keys = {
+        key for key, in db.query(CatalogFilter.param_key).all()
+    }
+    inserted = 0
+    for item in FILTER_SEED:
+        if item["param_key"] in existing_keys:
+            continue
+        db.add(CatalogFilter(**item))
+        inserted += 1
+    if inserted:
+        db.commit()
+    return inserted
+
+
+def seed_configurator_profiles(db) -> int:
+    existing_slugs = {
+        slug for slug, in db.query(ConfiguratorProfile.slug).all()
+    }
+    inserted = 0
+    for item in CONFIGURATOR_PROFILE_SEED:
+        if item["slug"] in existing_slugs:
+            continue
+        db.add(ConfiguratorProfile(**item))
+        inserted += 1
+    if inserted:
+        db.commit()
+    return inserted
+
+
+def seed_configurator_categories(db) -> int:
+    profiles_by_slug = {row.slug: row for row in db.query(ConfiguratorProfile).all()}
+    existing = {
+        (profile_id, slug)
+        for profile_id, slug in db.query(ConfiguratorCategory.profile_id, ConfiguratorCategory.slug).all()
+    }
+    inserted = 0
+    touched_profiles: set[str] = set()
+
+    for item in CONFIGURATOR_CATEGORY_SEED:
+        profile = profiles_by_slug.get(item["profile_slug"])
+        if not profile:
+            continue
+        key = (profile.id, item["slug"])
+        if key in existing:
+            continue
+        db.add(
+            ConfiguratorCategory(
+                profile_id=profile.id,
+                name=item["name"],
+                slug=item["slug"],
+                description=item.get("description"),
+                sort_order=item.get("sort_order", 0),
+                is_required=item.get("is_required", False),
+                selection_mode=item.get("selection_mode", "single"),
+                product_count=item.get("product_count", 0),
+                status=item.get("status", "draft"),
+            ),
+        )
+        touched_profiles.add(profile.id)
+        inserted += 1
+
+    if inserted:
+        db.commit()
+        for profile_id in touched_profiles:
+            profile = db.get(ConfiguratorProfile, profile_id)
+            if profile:
+                profile.category_count = (
+                    db.query(ConfiguratorCategory)
+                    .filter(ConfiguratorCategory.profile_id == profile_id)
+                    .count()
+                )
+        db.commit()
+    return inserted
+
+
+def seed_configurator_templates(db) -> int:
+    profiles_by_slug = {row.slug: row for row in db.query(ConfiguratorProfile).all()}
+    categories_by_key = {
+        (row.profile_id, row.slug): row
+        for row in db.query(ConfiguratorCategory).all()
+    }
+    existing = {
+        (profile_id, slug)
+        for profile_id, slug in db.query(ConfiguratorTemplate.profile_id, ConfiguratorTemplate.slug).all()
+    }
+    inserted = 0
+    touched_profiles: set[str] = set()
+
+    for item in CONFIGURATOR_TEMPLATE_SEED:
+        profile = profiles_by_slug.get(item["profile_slug"])
+        if not profile:
+            continue
+        key = (profile.id, item["slug"])
+        if key in existing:
+            continue
+
+        components = []
+        for comp in item.get("components", []):
+            category = categories_by_key.get((profile.id, comp["category_slug"]))
+            if not category:
+                continue
+            components.append(
+                {
+                    "category_id": category.id,
+                    "category_name": comp.get("category_name", category.name),
+                    "product_name": comp.get("product_name"),
+                    "quantity": comp.get("quantity", 1),
+                },
+            )
+
+        db.add(
+            ConfiguratorTemplate(
+                profile_id=profile.id,
+                name=item["name"],
+                slug=item["slug"],
+                description=item.get("description"),
+                components_json=dump_components(components),
+                is_featured=item.get("is_featured", False),
+                status=item.get("status", "draft"),
+                use_count=item.get("use_count", 0),
+            ),
+        )
+        touched_profiles.add(profile.id)
+        inserted += 1
+
+    if inserted:
+        db.commit()
+        for profile_id in touched_profiles:
+            profile = db.get(ConfiguratorProfile, profile_id)
+            if profile:
+                profile.template_count = (
+                    db.query(ConfiguratorTemplate)
+                    .filter(ConfiguratorTemplate.profile_id == profile_id)
+                    .count()
+                )
+        db.commit()
+    return inserted
+
+
+def seed_configurator_builds(db) -> int:
+    profiles_by_slug = {row.slug: row for row in db.query(ConfiguratorProfile).all()}
+    categories_by_key = {
+        (row.profile_id, row.slug): row
+        for row in db.query(ConfiguratorCategory).all()
+    }
+    existing_codes = {code for code, in db.query(ConfiguratorBuild.build_code).all()}
+    inserted = 0
+    touched_profiles: set[str] = set()
+
+    for item in CONFIGURATOR_BUILD_SEED:
+        if item["build_code"] in existing_codes:
+            continue
+        profile = profiles_by_slug.get(item["profile_slug"])
+        if not profile:
+            continue
+
+        components = []
+        for comp in item.get("components", []):
+            category = categories_by_key.get((profile.id, comp["category_slug"]))
+            if not category:
+                continue
+            components.append(
+                {
+                    "category_id": category.id,
+                    "category_name": comp.get("category_name", category.name),
+                    "product_name": comp.get("product_name"),
+                    "quantity": comp.get("quantity", 1),
+                },
+            )
+
+        db.add(
+            ConfiguratorBuild(
+                profile_id=profile.id,
+                name=item["name"],
+                build_code=item["build_code"],
+                customer_name=item.get("customer_name"),
+                user_name=item.get("user_name"),
+                components_json=dump_components(components),
+                total_price=Decimal(str(item.get("total_price", 0))),
+                compatibility_status=item.get("compatibility_status", "compatible"),
+                status=item.get("status", "draft"),
+            ),
+        )
+        touched_profiles.add(profile.id)
+        inserted += 1
+
+    if inserted:
+        db.commit()
+        for profile_id in touched_profiles:
+            profile = db.get(ConfiguratorProfile, profile_id)
+            if profile:
+                profile.build_count = (
+                    db.query(ConfiguratorBuild)
+                    .filter(ConfiguratorBuild.profile_id == profile_id)
+                    .count()
+                )
         db.commit()
     return inserted
 
@@ -1109,6 +1350,48 @@ def ensure_cloudflare_plugin_columns() -> None:
             conn.execute(text(stmt))
 
 
+def ensure_product_columns() -> None:
+    """Migrate catalog_products for AgainERP-aligned fields."""
+    statements = [
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) NOT NULL DEFAULT 'simple'",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS visibility VARCHAR(20) NOT NULL DEFAULT 'public'",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS brand_id VARCHAR(36)",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS category_id VARCHAR(36)",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS short_description TEXT",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS tags_json TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS seo_title VARCHAR(255)",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS seo_description TEXT",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS attribute_profile_id VARCHAR(36)",
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+
+def link_product_taxonomy(db) -> int:
+    """Backfill category_id / brand_id on products from denormalized names."""
+    cat_by_name = {name: cid for name, cid in db.query(CatalogCategory.name, CatalogCategory.id).all()}
+    brand_by_name = {name: bid for name, bid in db.query(CatalogBrand.name, CatalogBrand.id).all()}
+    updated = 0
+    for product in db.query(CatalogProduct).all():
+        changed = False
+        if product.category and not product.category_id:
+            cid = cat_by_name.get(product.category)
+            if cid:
+                product.category_id = cid
+                changed = True
+        if product.brand and not product.brand_id:
+            bid = brand_by_name.get(product.brand)
+            if bid:
+                product.brand_id = bid
+                changed = True
+        if changed:
+            updated += 1
+    if updated:
+        db.commit()
+    return updated
+
+
 def seed_cloudflare_plugin(db) -> int:
     if db.get(CloudflarePlugin, "cf-default"):
         return 0
@@ -1311,6 +1594,7 @@ def main() -> None:
     print("Creating tables…")
     Base.metadata.create_all(bind=engine)
     ensure_cloudflare_plugin_columns()
+    ensure_product_columns()
     print("  Tables ready.")
 
     db = SessionLocal()
@@ -1342,6 +1626,52 @@ def main() -> None:
         print(
             f"  Brands: {after_brands} ({inserted_brands} new, {before_brands} before seed).",
         )
+
+        before_collections = db.query(CatalogCollection).count()
+        inserted_collections = seed_collections(db)
+        after_collections = db.query(CatalogCollection).count()
+        print(
+            f"  Collections: {after_collections} ({inserted_collections} new, {before_collections} before seed).",
+        )
+
+        before_filters = db.query(CatalogFilter).count()
+        inserted_filters = seed_filters(db)
+        after_filters = db.query(CatalogFilter).count()
+        print(
+            f"  Filters: {after_filters} ({inserted_filters} new, {before_filters} before seed).",
+        )
+
+        before_cfg_profiles = db.query(ConfiguratorProfile).count()
+        inserted_cfg_profiles = seed_configurator_profiles(db)
+        after_cfg_profiles = db.query(ConfiguratorProfile).count()
+        print(
+            f"  Configurator profiles: {after_cfg_profiles} ({inserted_cfg_profiles} new, {before_cfg_profiles} before seed).",
+        )
+
+        before_cfg_categories = db.query(ConfiguratorCategory).count()
+        inserted_cfg_categories = seed_configurator_categories(db)
+        after_cfg_categories = db.query(ConfiguratorCategory).count()
+        print(
+            f"  Configurator categories: {after_cfg_categories} ({inserted_cfg_categories} new, {before_cfg_categories} before seed).",
+        )
+
+        before_cfg_templates = db.query(ConfiguratorTemplate).count()
+        inserted_cfg_templates = seed_configurator_templates(db)
+        after_cfg_templates = db.query(ConfiguratorTemplate).count()
+        print(
+            f"  Configurator templates: {after_cfg_templates} ({inserted_cfg_templates} new, {before_cfg_templates} before seed).",
+        )
+
+        before_cfg_builds = db.query(ConfiguratorBuild).count()
+        inserted_cfg_builds = seed_configurator_builds(db)
+        after_cfg_builds = db.query(ConfiguratorBuild).count()
+        print(
+            f"  Configurator builds: {after_cfg_builds} ({inserted_cfg_builds} new, {before_cfg_builds} before seed).",
+        )
+
+        linked = link_product_taxonomy(db)
+        if linked:
+            print(f"  Linked taxonomy on {linked} product(s).")
 
         before_profiles = db.query(CatalogAttributeProfile).count()
         inserted_profiles = seed_attribute_profiles(db)

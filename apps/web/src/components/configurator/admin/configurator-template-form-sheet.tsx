@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { FileStack } from "lucide-react";
-import { toast } from "sonner";
 import { CONFIGURATOR_STATUSES, STATUS_LABELS, type ConfiguratorTemplate } from "@/lib/configurator/types";
-import { useConfiguratorTemplateStore } from "@/lib/store/configurator-template-store";
-import { useConfiguratorProfileStore } from "@/lib/store/configurator-profile-store";
+import { useConfiguratorProfiles } from "@/lib/api/use-configurator-profiles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,16 +12,32 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+type SaveData = {
+  profileId: string;
+  name: string;
+  slug?: string;
+  description?: string;
+  components: ConfiguratorTemplate["components"];
+  isFeatured: boolean;
+  status: ConfiguratorTemplate["status"];
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   template?: ConfiguratorTemplate | null;
   defaultProfileId: string;
+  onSave: (data: SaveData) => void;
 };
 
-export function ConfiguratorTemplateFormSheet({ open, onOpenChange, template, defaultProfileId }: Props) {
-  const upsert = useConfiguratorTemplateStore((s) => s.upsert);
-  const profiles = useConfiguratorProfileStore((s) => s.profiles);
+export function ConfiguratorTemplateFormSheet({
+  open,
+  onOpenChange,
+  template,
+  defaultProfileId,
+  onSave,
+}: Props) {
+  const { profiles } = useConfiguratorProfiles();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
@@ -41,14 +55,10 @@ export function ConfiguratorTemplateFormSheet({ open, onOpenChange, template, de
     setIsFeatured(template?.isFeatured ?? false);
   }, [open, template, defaultProfileId]);
 
-  const profileName = profiles.find((p) => p.id === profileId)?.name ?? "";
-
   const handleSave = () => {
-    if (!name.trim()) { toast.error("Name required"); return; }
-    upsert({
-      id: template?.id,
+    if (!name.trim()) return;
+    onSave({
       profileId,
-      profileName,
       name: name.trim(),
       slug: slug.trim() || undefined,
       description: description.trim() || undefined,
@@ -56,8 +66,6 @@ export function ConfiguratorTemplateFormSheet({ open, onOpenChange, template, de
       status,
       isFeatured,
     });
-    toast.success(template ? "Template updated" : "Template created");
-    onOpenChange(false);
   };
 
   return (

@@ -17,8 +17,22 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { Product, ProductStatus } from "@/lib/mock-data/products";
-import { createCatalogProduct, updateCatalogProduct } from "@/lib/api/use-catalog-products";
+import type { Product, ProductStatus, ProductVisibility } from "@/lib/mock-data/products";
+import type { VariantMatrixRow } from "@/lib/mock-data/variants";
+import {
+  createCatalogProduct,
+  fetchProductSpecs,
+  replaceProductMedia,
+  replaceProductSpecs,
+  replaceProductVariants,
+  updateCatalogProduct,
+  type VariantUpsertInput,
+} from "@/lib/api/use-catalog-products";
+import type { ProductSpecsDraft } from "@/components/specifications/product-spec-editor";
+import { useCatalogProduct } from "@/lib/api/use-catalog-product";
+import { useCatalogCategories } from "@/lib/api/use-catalog-categories";
+import { useCatalogBrands } from "@/lib/api/use-catalog-brands";
+import { useCatalogMedia } from "@/lib/api/use-catalog-media";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,9 +47,6 @@ import { MediaLibraryModal } from "@/components/media/media-library-modal";
 import type { MediaLibraryItem } from "@/lib/mock-data/media-library";
 import { ProductSpecEditor } from "@/components/specifications/product-spec-editor";
 import { ProductVariantEditor } from "@/components/products/product-variant-editor";
-
-const CATEGORIES = ["Apparel", "Electronics", "Home", "Beauty", "Sports", "Books"];
-const BRANDS = ["UrbanWear", "TechPro", "HomeNest", "GlowUp", "ActiveLife", "ReadWell"];
 
 const SECTIONS = [
   { id: "general", label: "General", icon: Package },
@@ -55,8 +66,11 @@ export type ProductFormValues = {
   name: string;
   sku: string;
   category: string;
+  categoryId: string;
   brand: string;
+  brandId: string;
   status: ProductStatus;
+  visibility: ProductVisibility;
   tags: string;
   shortDescription: string;
   description: string;
@@ -77,9 +91,12 @@ export type ProductFormValues = {
 const DEFAULT_VALUES: ProductFormValues = {
   name: "",
   sku: "",
-  category: "Apparel",
-  brand: "UrbanWear",
+  category: "",
+  categoryId: "",
+  brand: "",
+  brandId: "",
   status: "draft",
+  visibility: "public",
   tags: "",
   shortDescription: "",
   description: "",
@@ -115,13 +132,69 @@ function slugifyName(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function variantsToRows(
+  variants: { id: string; sku: string; name: string; price: string; stock: number; is_default: boolean }[],
+): VariantMatrixRow[] {
+  return variants.map((v) => ({
+    id: v.id,
+    label: v.name,
+    sku: v.sku,
+    price: parseFloat(v.price) || 0,
+    stock: v.stock,
+    isDefault: v.is_default,
+    dimensions: {},
+  }));
+}
+
+function rowsToVariantUpserts(rows: VariantMatrixRow[]): VariantUpsertInput[] {
+  return rows.map((row, idx) => ({
+    id: row.id.startsWith("new_") ? undefined : row.id,
+    sku: row.sku,
+    name: row.label,
+    price: row.price,
+    stock: row.stock,
+    is_default: row.isDefault,
+    sort_order: idx,
+  }));
+}
+
+function buildProductPayload(values: ProductFormValues, publish: boolean) {
+  return {
+    name: values.name.trim(),
+    slug: values.slug.trim() || slugifyName(values.name),
+    sku: values.sku.trim(),
+    price: parseFloat(values.price) || 0,
+    compare_at_price: values.compareAtPrice ? parseFloat(values.compareAtPrice) : undefined,
+    category: values.category,
+    category_id: values.categoryId || null,
+    brand: values.brand,
+    brand_id: values.brandId || null,
+    stock: parseInt(values.stock, 10) || 0,
+    status: (publish ? "published" : values.status) as ProductStatus,
+    product_type: values.productType,
+    visibility: values.visibility,
+    description: values.description.trim() || undefined,
+    short_description: values.shortDescription.trim() || undefined,
+    seo_title: values.metaTitle.trim() || undefined,
+    seo_description: values.metaDescription.trim() || undefined,
+    tags: values.tags.split(",").map((t) => t.trim()).filter(Boolean),
+  };
+}
+
 export function ProductForm({ mode = "create", initialProduct, compact, inDialog, onClose, onSaved }: Props) {
   const router = useRouter();
+  const { categories } = useCatalogCategories();
+  const { brands } = useCatalogBrands();
+  const { items: mediaItems, refetch: refetchMedia } = useCatalogMedia();
+  const editId = mode === "edit" ? initialProduct?.id : undefined;
+  const { product: productDetail, loading: detailLoading } = useCatalogProduct(editId);
   const [saving, setSaving] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [section, setSection] = useState<SectionId>("general");
   const [autosave, setAutosave] = useState("All changes saved");
   const [productMedia, setProductMedia] = useState<MediaLibraryItem[]>([]);
+  const [variantRows, setVariantRows] = useState<VariantMatrixRow[]>([]);
+  const [specDraft, setSpecDraft] = useState<ProductSpecsDraft>({ profileId: "", valuesByAttributeId: {} });
   const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
   const [values, setValues] = useState<ProductFormValues>(() => ({
     ...DEFAULT_VALUES,
@@ -163,23 +236,74 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
   }, []);
 
   useEffect(() => {
-    if (!initialProduct || mode !== "edit") return;
+    if (!productDetail || mode !== "edit") return;
     setValues({
       ...DEFAULT_VALUES,
-      name: initialProduct.name,
-      sku: initialProduct.sku,
-      category: initialProduct.category,
-      brand: initialProduct.brand,
-      status: initialProduct.status,
-      tags: initialProduct.tags.join(", "),
-      description: initialProduct.description ?? "",
-      price: String(initialProduct.price),
-      compareAtPrice: initialProduct.compareAtPrice ? String(initialProduct.compareAtPrice) : "",
-      stock: String(initialProduct.stock),
-      metaTitle: initialProduct.name,
-      slug: initialProduct.slug,
+      name: productDetail.name,
+      sku: productDetail.sku,
+      category: productDetail.category,
+      categoryId: productDetail.categoryId ?? "",
+      brand: productDetail.brand,
+      brandId: productDetail.brandId ?? "",
+      status: productDetail.status,
+      visibility: productDetail.visibility ?? "public",
+      tags: productDetail.tags.join(", "),
+      shortDescription: productDetail.shortDescription ?? "",
+      description: productDetail.description ?? "",
+      price: String(productDetail.price),
+      compareAtPrice: productDetail.compareAtPrice ? String(productDetail.compareAtPrice) : "",
+      stock: String(productDetail.stock),
+      metaTitle: productDetail.metaTitle || productDetail.name,
+      metaDescription: productDetail.metaDescription ?? "",
+      slug: productDetail.slug,
+      productType: productDetail.productType,
     });
-  }, [initialProduct, mode]);
+    setVariantRows(variantsToRows(productDetail.variants));
+    setProductMedia(
+      productDetail.mediaLinks.map((m) => ({
+        id: m.media_id,
+        name: m.name,
+        title: m.name,
+        folder: "Products",
+        url: m.url,
+        type: m.media_type === "video" ? "video" : "image",
+        mimeType: m.media_type === "video" ? "video/mp4" : "image/jpeg",
+        sizeKb: 0,
+        alt: m.name,
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: "API",
+        provider: "direct" as const,
+      })),
+    );
+  }, [productDetail, mode]);
+
+  useEffect(() => {
+    if (!productDetail?.id || mode !== "edit") return;
+    void fetchProductSpecs(productDetail.id).then((specs) => {
+      const valuesByAttributeId: Record<string, string> = {};
+      for (const item of specs.values) {
+        valuesByAttributeId[item.attributeId] = item.value;
+      }
+      setSpecDraft({
+        profileId: specs.attributeProfileId ?? productDetail.attributeProfileId ?? "",
+        valuesByAttributeId,
+      });
+    });
+  }, [productDetail, mode]);
+
+  const handleSpecChange = useCallback((draft: ProductSpecsDraft) => {
+    setSpecDraft(draft);
+  }, []);
+
+  async function persistSpecs(productId: string) {
+    const values = Object.entries(specDraft.valuesByAttributeId)
+      .filter(([, value]) => value.trim())
+      .map(([attributeId, value]) => ({ attributeId, value: value.trim() }));
+    await replaceProductSpecs(productId, {
+      attributeProfileId: specDraft.profileId || null,
+      values,
+    });
+  }
 
   const handleSave = async (publish = false) => {
     if (!values.name.trim()) {
@@ -187,64 +311,46 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
       setSection("general");
       return;
     }
-    if (mode === "create") {
-      setSaving(true);
-      try {
-        const slug = values.slug.trim() || slugifyName(values.name);
-        const sku = values.sku.trim() || `SKU-${Date.now().toString().slice(-6)}`;
-        await createCatalogProduct({
-          name: values.name.trim(),
-          slug,
-          sku,
-          price: parseFloat(values.price) || 0,
-          category: values.category,
-          brand: values.brand,
-          stock: parseInt(values.stock, 10) || 0,
-          status: publish ? "published" : "draft",
-          description: values.description.trim() || undefined,
-        });
+    const payload = buildProductPayload(values, publish);
+    setSaving(true);
+    try {
+      if (mode === "create") {
+        const slug = payload.slug || slugifyName(values.name);
+        const sku = payload.sku || `SKU-${Date.now().toString().slice(-6)}`;
+        const created = await createCatalogProduct({ ...payload, slug, sku });
+        if (values.productType === "variable" && variantRows.length > 0) {
+          await replaceProductVariants(created.id, rowsToVariantUpserts(variantRows));
+        }
+        if (productMedia.length > 0) {
+          await replaceProductMedia(created.id, productMedia.map((m) => m.id));
+        }
+        if (specDraft.profileId || Object.values(specDraft.valuesByAttributeId).some((v) => v.trim())) {
+          await persistSpecs(created.id);
+        }
         toast.success(publish ? "Product published" : "Product saved as draft");
         onSaved?.();
         if (onClose) onClose();
         else router.push("/catalog/products");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to save product");
-      } finally {
-        setSaving(false);
+        return;
       }
-      return;
-    }
-    if (mode === "edit" && initialProduct) {
-      setSaving(true);
-      try {
-        await updateCatalogProduct(initialProduct.id, {
-          name: values.name.trim(),
-          slug: values.slug.trim() || slugifyName(values.name),
-          sku: values.sku.trim(),
-          price: parseFloat(values.price) || 0,
-          compare_at_price: values.compareAtPrice
-            ? parseFloat(values.compareAtPrice)
-            : undefined,
-          category: values.category,
-          brand: values.brand,
-          stock: parseInt(values.stock, 10) || 0,
-          status: publish ? "published" : "draft",
-          description: values.description.trim() || undefined,
-        });
-        toast.success(publish ? "Product published" : "Product saved as draft");
+
+      if (mode === "edit" && initialProduct) {
+        await updateCatalogProduct(initialProduct.id, payload);
+        if (values.productType === "variable") {
+          await replaceProductVariants(initialProduct.id, rowsToVariantUpserts(variantRows));
+        }
+        await replaceProductMedia(initialProduct.id, productMedia.map((m) => m.id));
+        await persistSpecs(initialProduct.id);
+        toast.success(publish ? "Product published" : "Product updated");
         onSaved?.();
         if (onClose) onClose();
         else router.push("/catalog/products");
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to update product");
-      } finally {
-        setSaving(false);
       }
-      return;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save product");
+    } finally {
+      setSaving(false);
     }
-    toast.success(publish ? "Product published (mock)" : "Product saved as draft (mock)");
-    if (onClose) onClose();
-    else router.push("/catalog/products");
   };
 
   const title = mode === "create" ? "Add Product" : "Edit Product";
@@ -259,10 +365,10 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
       >
         Discard
       </Button>
-      <Button variant="secondary" size="sm" className="flex-1 sm:flex-none" onClick={() => void handleSave(false)} disabled={saving}>
+      <Button variant="secondary" size="sm" className="flex-1 sm:flex-none" onClick={() => void handleSave(false)} disabled={saving || detailLoading}>
         {saving ? "Saving…" : "Save draft"}
       </Button>
-      <Button size="sm" className="flex-1 sm:flex-none" onClick={() => void handleSave(true)} disabled={saving}>
+      <Button size="sm" className="flex-1 sm:flex-none" onClick={() => void handleSave(true)} disabled={saving || detailLoading}>
         {saving ? "Publishing…" : "Publish"}
       </Button>
     </>
@@ -457,12 +563,17 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
                 <Field label="Category" required>
                   <div className="flex flex-col gap-1 sm:flex-row">
                     <Select
-                      value={values.category}
-                      onChange={(e) => set("category", e.target.value)}
+                      value={values.categoryId || values.category}
+                      onChange={(e) => {
+                        const cat = categories.find((c) => c.id === e.target.value || c.name === e.target.value);
+                        set("categoryId", cat?.id ?? "");
+                        set("category", cat?.name ?? e.target.value);
+                      }}
                       className="min-w-0 flex-1"
                     >
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{c}</option>
+                      <option value="">Select category</option>
+                      {categories.filter((c) => c.active).map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </Select>
                     <Button type="button" variant="outline" size="sm" className="shrink-0 sm:w-9 sm:px-0">
@@ -473,12 +584,17 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
                 <Field label="Brand">
                   <div className="flex flex-col gap-1 sm:flex-row">
                     <Select
-                      value={values.brand}
-                      onChange={(e) => set("brand", e.target.value)}
+                      value={values.brandId || values.brand}
+                      onChange={(e) => {
+                        const brand = brands.find((b) => b.id === e.target.value || b.name === e.target.value);
+                        set("brandId", brand?.id ?? "");
+                        set("brand", brand?.name ?? e.target.value);
+                      }}
                       className="min-w-0 flex-1"
                     >
-                      {BRANDS.map((b) => (
-                        <option key={b} value={b}>{b}</option>
+                      <option value="">Select brand</option>
+                      {brands.filter((b) => b.active).map((b) => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
                       ))}
                     </Select>
                     <Button type="button" variant="outline" size="sm" className="shrink-0 sm:w-9 sm:px-0">
@@ -494,6 +610,15 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
                     <option value="draft">Draft</option>
                     <option value="published">Published</option>
                     <option value="archived">Archived</option>
+                  </Select>
+                </Field>
+                <Field label="Storefront visibility">
+                  <Select
+                    value={values.visibility}
+                    onChange={(e) => set("visibility", e.target.value as ProductVisibility)}
+                  >
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
                   </Select>
                 </Field>
                 <Field label="Tags" hint="Comma separated">
@@ -631,13 +756,20 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
                 baseSku={values.sku}
                 basePrice={values.price}
                 category={values.category}
+                rows={variantRows}
+                onRowsChange={setVariantRows}
               />
             </Section>
           )}
 
           {section === "specifications" && (
             <Section title="Specifications" description="Select a profile and fill specification values for this product">
-              <ProductSpecEditor />
+              <ProductSpecEditor
+                productId={initialProduct?.id}
+                initialProfileId={specDraft.profileId}
+                initialValues={specDraft.valuesByAttributeId}
+                onChange={handleSpecChange}
+              />
             </Section>
           )}
 
@@ -813,7 +945,11 @@ export function ProductForm({ mode = "create", initialProduct, compact, inDialog
 
       <MediaLibraryModal
         open={mediaLibraryOpen}
-        onOpenChange={setMediaLibraryOpen}
+        onOpenChange={(open) => {
+          setMediaLibraryOpen(open);
+          if (open) void refetchMedia();
+        }}
+        items={mediaItems}
         mode="multiple"
         title="Add Media"
         accept={["image", "video"]}

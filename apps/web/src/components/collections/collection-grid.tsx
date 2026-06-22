@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { AgGridReact } from "ag-grid-react";
 import type { ColDef, ICellRendererParams, RowDragEndEvent } from "ag-grid-community";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -22,7 +22,13 @@ import {
   type CollectionType,
   type ProductCollection,
 } from "@/lib/mock-data/collections";
-import { useCollectionStore } from "@/lib/store/collection-store";
+import {
+  bulkPatchCatalogCollections,
+  deleteCatalogCollections,
+  patchCatalogCollection,
+  reorderCatalogCollections,
+} from "@/lib/api/use-catalog-collections";
+import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { cn } from "@/lib/utils";
 import { useIsDark } from "@/lib/use-is-dark";
 import { Button } from "@/components/ui/button";
@@ -39,7 +45,6 @@ import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SlugCellEditor } from "@/components/data-grid/slug-cell-editor";
 import { slugCellClassRules } from "@/components/data-grid/slug-cell-rules";
 import { slugHasError, validateSlug } from "@/lib/url-slug/validate-slug";
-import { CollectionFormDialog } from "@/components/collections/collection-form-dialog";
 import { CollectionMobileCards } from "@/components/collections/collection-mobile-cards";
 
 const PAGE_SIZE = 25;
@@ -167,23 +172,25 @@ function statusBadgeClass(status: CollectionStatus) {
 
 type Props = {
   className?: string;
+  /** @deprecated Use onEdit from the page instead */
   addTrigger?: number;
+  collections: ProductCollection[];
+  loading?: boolean;
+  onCollectionsChanged?: () => void;
+  onEdit?: (collection: ProductCollection) => void;
 };
 
-export function CollectionGrid({ className, addTrigger = 0 }: Props) {
+export function CollectionGrid({
+  className,
+  collections,
+  loading: _loading = false,
+  onCollectionsChanged,
+  onEdit: onEditProp,
+}: Props) {
   const isDark = useIsDark();
+  const canWrite = useAdminCanWrite();
   const gridRef = useRef<AgGridReact<ProductCollection>>(null);
-  const collections = useCollectionStore((s) => s.collections);
-  const getDisplayOrder = useCollectionStore((s) => s.getDisplayOrder);
-  const upsertCollection = useCollectionStore((s) => s.upsertCollection);
-  const patchCollection = useCollectionStore((s) => s.patchCollection);
-  const reorderCollections = useCollectionStore((s) => s.reorderCollections);
-  const deleteCollections = useCollectionStore((s) => s.deleteCollections);
-
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [formOpen, setFormOpen] = useState(false);
-  const [formMode, setFormMode] = useState<"create" | "edit">("create");
-  const [editCollection, setEditCollection] = useState<ProductCollection | null>(null);
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<ProductCollection[]>([]);
   const [columnSheetOpen, setColumnSheetOpen] = useState(false);
@@ -195,58 +202,67 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteTargets, setDeleteTargets] = useState<ProductCollection[]>([]);
 
-  const ordered = useMemo(() => getDisplayOrder(), [collections, getDisplayOrder]);
+  const ordered = useMemo(
+    () => [...collections].sort((a, b) => a.sortOrder - b.sortOrder),
+    [collections],
+  );
   const filtered = useMemo(() => applyFilters(ordered, filters), [ordered, filters]);
 
-  const openCreate = useCallback(() => {
-    setFormMode("create");
-    setEditCollection(null);
-    setFormOpen(true);
-  }, []);
-
-  const openEdit = useCallback((collection: ProductCollection) => {
-    setFormMode("edit");
-    setEditCollection(collection);
-    setFormOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (addTrigger > 0) openCreate();
-  }, [addTrigger, openCreate]);
+  const openEdit = useCallback(
+    (collection: ProductCollection) => {
+      onEditProp?.(collection);
+    },
+    [onEditProp],
+  );
 
   const cycleStatus = useCallback(
-    (collection: ProductCollection) => {
+    async (collection: ProductCollection) => {
       const idx = STATUS_CYCLE.indexOf(collection.status);
       const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
-      patchCollection(collection.id, { status: next });
+      try {
+        await patchCatalogCollection(collection.id, { status: next });
+        onCollectionsChanged?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Update failed");
+      }
     },
-    [patchCollection],
+    [onCollectionsChanged],
   );
 
   const archiveCollection = useCallback(
-    (collection: ProductCollection) => {
+    async (collection: ProductCollection) => {
       if (collection.isSystem) {
         toast.error("System collections cannot be archived");
         return;
       }
-      patchCollection(collection.id, { status: "archived" });
-      toast.success(`Archived ${collection.name}`);
+      try {
+        await patchCatalogCollection(collection.id, { status: "archived" });
+        toast.success(`Archived ${collection.name}`);
+        onCollectionsChanged?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Archive failed");
+      }
     },
-    [patchCollection],
+    [onCollectionsChanged],
   );
 
   const bulkUpdateStatus = useCallback(
-    (targets: ProductCollection[], status: CollectionStatus, label: string) => {
-      const ids = new Set(targets.map((t) => t.id));
-      targets.forEach((t) => {
-        if (!t.isSystem || status !== "archived") {
-          if (ids.has(t.id)) patchCollection(t.id, { status });
-        }
-      });
-      toast.success(`${label} (${targets.length})`);
-      setSelected([]);
+    async (targets: ProductCollection[], status: CollectionStatus, label: string) => {
+      const eligible = targets.filter((t) => !t.isSystem || status !== "archived");
+      if (eligible.length === 0) {
+        toast.error("System collections cannot be archived");
+        return;
+      }
+      try {
+        await bulkPatchCatalogCollections(eligible, { status });
+        toast.success(`${label} (${eligible.length})`);
+        setSelected([]);
+        onCollectionsChanged?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Bulk update failed");
+      }
     },
-    [patchCollection],
+    [onCollectionsChanged],
   );
 
   const openDeleteConfirm = useCallback((targets: ProductCollection[]) => {
@@ -259,18 +275,23 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
     setDeleteOpen(true);
   }, []);
 
-  const confirmDelete = useCallback(() => {
-    deleteCollections(deleteTargets.map((t) => t.id));
-    toast.success(
-      `Deleted ${deleteTargets.length} collection${deleteTargets.length > 1 ? "s" : ""}`,
-    );
-    setDeleteOpen(false);
-    setDeleteTargets([]);
-    setSelected([]);
-  }, [deleteTargets, deleteCollections]);
+  const confirmDelete = useCallback(async () => {
+    try {
+      await deleteCatalogCollections(deleteTargets.map((t) => t.id));
+      toast.success(
+        `Deleted ${deleteTargets.length} collection${deleteTargets.length > 1 ? "s" : ""}`,
+      );
+      setDeleteOpen(false);
+      setDeleteTargets([]);
+      setSelected([]);
+      onCollectionsChanged?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  }, [deleteTargets, onCollectionsChanged]);
 
   const onCellValueChanged = useCallback(
-    (e: { data: ProductCollection; colDef: { field?: string } }) => {
+    async (e: { data: ProductCollection; colDef: { field?: string } }) => {
       const field = e.colDef.field;
       if (!field || !e.data?.id) return;
       if (field === "slug" && slugHasError(e.data.slug, { id: e.data.id })) {
@@ -278,12 +299,17 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         toast.error(validation.message ?? "Slug already in use");
         return;
       }
-      patchCollection(e.data.id, {
-        [field]: e.data[field as keyof ProductCollection],
-      } as Partial<ProductCollection>);
-      toast.success(`Updated ${field}`);
+      try {
+        await patchCatalogCollection(e.data.id, {
+          [field]: e.data[field as keyof ProductCollection],
+        } as Partial<ProductCollection>);
+        toast.success(`Updated ${field}`);
+        onCollectionsChanged?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Update failed");
+      }
     },
-    [patchCollection],
+    [onCollectionsChanged],
   );
 
   const StatusCell = useCallback(
@@ -321,16 +347,8 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
     );
   }, []);
 
-  const handleSave = (data: Partial<ProductCollection>) => {
-    if (formMode === "create") {
-      upsertCollection(data);
-    } else if (editCollection) {
-      upsertCollection({ id: editCollection.id, ...data });
-    }
-  };
-
   const onRowDragEnd = useCallback(
-    (e: RowDragEndEvent<ProductCollection>) => {
+    async (e: RowDragEndEvent<ProductCollection>) => {
       const dragged = e.node.data;
       const over = e.overNode?.data;
       if (!dragged || !over) return;
@@ -341,10 +359,16 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         return;
       }
 
-      reorderCollections(orderedIds);
-      toast.success("Display order updated");
+      try {
+        await reorderCatalogCollections(orderedIds);
+        toast.success("Display order updated");
+        onCollectionsChanged?.();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Reorder failed");
+        e.api.setGridOption("rowData", filtered);
+      }
     },
-    [collections, filtered, reorderCollections],
+    [collections, filtered, onCollectionsChanged],
   );
 
   const RowActions = useCallback(
@@ -376,8 +400,8 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
   const columnDefs = useMemo<ColDef<ProductCollection>[]>(
     () => [
       {
-        headerCheckboxSelection: true,
-        checkboxSelection: true,
+        headerCheckboxSelection: canWrite,
+        checkboxSelection: canWrite,
         width: 32,
         maxWidth: 32,
         pinned: "left",
@@ -386,7 +410,7 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         suppressHeaderMenuButton: true,
       },
       {
-        rowDrag: true,
+        rowDrag: canWrite,
         width: 36,
         maxWidth: 36,
         pinned: "left",
@@ -419,7 +443,7 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         headerName: "Name",
         width: 200,
         minWidth: 140,
-        editable: liveEdit.name,
+        editable: canWrite && liveEdit.name,
         tooltipField: "name",
         cellClass: "font-medium text-foreground",
       },
@@ -428,9 +452,9 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         headerName: "Slug",
         width: 160,
         hide: !visibleCols.slug,
-        editable: liveEdit.slug,
+        editable: canWrite && liveEdit.slug,
         tooltipField: "slug",
-        cellEditor: liveEdit.slug ? SlugCellEditor : undefined,
+        cellEditor: canWrite && liveEdit.slug ? SlugCellEditor : undefined,
         cellClassRules: slugCellClassRules,
       },
       {
@@ -497,7 +521,7 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         suppressHeaderMenuButton: true,
       },
     ],
-    [RowActions, visibleCols, liveEdit, StatusCell, TypeCell],
+    [RowActions, visibleCols, liveEdit, StatusCell, TypeCell, canWrite],
   );
 
   const pageStart = page * PAGE_SIZE + 1;
@@ -556,7 +580,7 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
         )}
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
-          {selected.length > 0 && (
+          {selected.length > 0 && canWrite && (
             <>
               <span className="text-xs text-muted-foreground">{selected.length} selected</span>
               <Button
@@ -613,7 +637,7 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
             rowSelection="multiple"
             suppressRowClickSelection
             animateRows
-            rowDragManaged
+            rowDragManaged={canWrite}
             onRowDragEnd={onRowDragEnd}
             onCellValueChanged={onCellValueChanged}
             onSelectionChanged={() => {
@@ -646,15 +670,6 @@ export function CollectionGrid({ className, addTrigger = 0 }: Props) {
           onArchive={archiveCollection}
         />
       </div>
-
-      <CollectionFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        mode={formMode}
-        collection={editCollection}
-        onSave={handleSave}
-        onLiveChange={(data) => patchCollection(data.id, data)}
-      />
 
       <Sheet open={columnSheetOpen} onOpenChange={setColumnSheetOpen}>
         <SheetContent side="right" className="w-[min(320px,100vw)]">

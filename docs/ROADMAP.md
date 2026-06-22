@@ -41,12 +41,19 @@
 | 30 | Marketing Audiences | `marketing_audiences` | `/marketing/audiences` | `/marketing/audiences`, `/marketing/audiences/[id]` |
 | 31 | Marketing Journeys | `marketing_journeys` | `/marketing/journeys` | `/marketing/journeys`, `/marketing/journeys/[id]` |
 | 32 | AI API Connections | `ai_api_connections` | `/ai/connections` | `/settings/ai` save+connect, `/ai-os` DB + API status |
+| 33 | Product specs + attribute edit API | `catalog_product_attribute_values` | `/products/{id}/specs`, attribute profile bulk | `/catalog/attributes/add`, `[id]`, product form specs |
+| 34 | Collections | `catalog_collections` | `/catalog/collections` | `/catalog/collections` list + edit dialog |
+| 35 | Catalog filters | `catalog_filters` | `/catalog/filters` | `/catalog/filters` list + edit dialog |
+| 36 | Configurator profiles | `configurator_profiles` | `/configurator/profiles` | `/product-configurator/profiles`, `[id]` |
+| 37 | Configurator categories | `configurator_categories` | `/configurator/categories` | `/product-configurator/categories` list + edit sheet |
+| 38 | Configurator templates | `configurator_templates` | `/configurator/templates` | `/product-configurator/templates` list + edit sheet |
+| 39 | Saved builds | `configurator_builds` | `/configurator/builds` | `/product-configurator/builds` list + detail sheet |
 
 ## Next (pick one per chat)
 
 | Step | Scope (MVP only) | Skip for now |
 |------|-------------------|--------------|
-| 33 | TBD — next commerce or platform module | OpenAI live calls |
+| 40 | Compatibility rules | Storefront filter panel |
 
 ## Lean rules (save tokens)
 

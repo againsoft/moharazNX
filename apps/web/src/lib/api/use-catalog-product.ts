@@ -1,18 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { Product } from "@/lib/mock-data/products";
-import { fetchCatalogProduct } from "@/lib/api/use-catalog-products";
+import {
+  fetchCatalogProductDetail,
+  type ProductDetail,
+} from "@/lib/api/use-catalog-products";
 
 type UseCatalogProductState = {
-  product: Product | null;
+  product: ProductDetail | null;
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 };
 
 export function useCatalogProduct(id: string | null | undefined): UseCatalogProductState {
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(Boolean(id));
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +28,7 @@ export function useCatalogProduct(id: string | null | undefined): UseCatalogProd
     setLoading(true);
     setError(null);
     try {
-      setProduct(await fetchCatalogProduct(id));
+      setProduct(await fetchCatalogProductDetail(id));
     } catch (err) {
       setProduct(null);
       setError(err instanceof Error ? err.message : "Product not found");

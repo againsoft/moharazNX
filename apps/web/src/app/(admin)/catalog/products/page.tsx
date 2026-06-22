@@ -10,6 +10,7 @@ import { ProductViewDialog } from "@/components/products/product-view-dialog";
 import { Button } from "@/components/ui/button";
 import type { Product } from "@/lib/mock-data/products";
 import { useCatalogProducts } from "@/lib/api/use-catalog-products";
+import { useCatalogCategories } from "@/lib/api/use-catalog-categories";
 import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { useViewerWriteUrlGuard } from "@/lib/hooks/use-viewer-write-url-guard";
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ function ProductListContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { products, total, loading, error, refetch } = useCatalogProducts();
+  const { categories } = useCatalogCategories();
   const canWrite = useAdminCanWrite();
 
   const createOpen = searchParams.get("create") === "1";
@@ -161,6 +163,7 @@ function ProductListContent() {
       ) : (
         <ProductGrid
           products={products}
+          categories={categories}
           loading={loading}
           onView={handleView}
           onEdit={handleEdit}

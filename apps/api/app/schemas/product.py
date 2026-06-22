@@ -1,10 +1,25 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def dump_tags(tags: Optional[List[str]]) -> str:
+    return json.dumps(tags or [])
+
+
+def load_tags(raw: Optional[str]) -> List[str]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except json.JSONDecodeError:
+        return []
 
 
 class ProductBase(BaseModel):
@@ -12,13 +27,31 @@ class ProductBase(BaseModel):
     slug: str = Field(min_length=1, max_length=255)
     sku: str = Field(min_length=1, max_length=100)
     description: Optional[str] = None
+    short_description: Optional[str] = None
     price: Decimal = Field(ge=0)
     compare_at_price: Optional[Decimal] = Field(default=None, ge=0)
     stock: int = Field(default=0, ge=0)
     status: str = Field(default="draft", pattern="^(draft|published|archived)$")
+    product_type: str = Field(default="simple", pattern="^(simple|variable)$")
+    visibility: str = Field(default="public", pattern="^(public|private)$")
     brand: Optional[str] = None
     category: Optional[str] = None
+    brand_id: Optional[str] = None
+    category_id: Optional[str] = None
+    attribute_profile_id: Optional[str] = None
     thumbnail: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def coerce_tags(cls, value: Any) -> List[str]:
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return load_tags(value)
+        return value
 
 
 class ProductCreate(ProductBase):
@@ -30,13 +63,22 @@ class ProductUpdate(BaseModel):
     slug: Optional[str] = Field(default=None, min_length=1, max_length=255)
     sku: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = None
+    short_description: Optional[str] = None
     price: Optional[Decimal] = Field(default=None, ge=0)
     compare_at_price: Optional[Decimal] = Field(default=None, ge=0)
     stock: Optional[int] = Field(default=None, ge=0)
     status: Optional[str] = Field(default=None, pattern="^(draft|published|archived)$")
+    product_type: Optional[str] = Field(default=None, pattern="^(simple|variable)$")
+    visibility: Optional[str] = Field(default=None, pattern="^(public|private)$")
     brand: Optional[str] = None
     category: Optional[str] = None
+    brand_id: Optional[str] = None
+    category_id: Optional[str] = None
+    attribute_profile_id: Optional[str] = None
     thumbnail: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    tags: Optional[List[str]] = None
 
 
 class ProductRead(ProductBase):
@@ -46,6 +88,32 @@ class ProductRead(ProductBase):
     company_id: str
     created_at: datetime
     updated_at: datetime
+
+
+class ProductVariantBrief(BaseModel):
+    id: str
+    sku: str
+    name: str
+    price: Decimal
+    stock: int
+    status: str
+    is_default: bool
+    sort_order: int
+
+
+class ProductMediaBrief(BaseModel):
+    id: str
+    media_id: str
+    url: str
+    name: str
+    media_type: str
+    sort_order: int
+    is_primary: bool
+
+
+class ProductDetailRead(ProductRead):
+    variants: List[ProductVariantBrief] = Field(default_factory=list)
+    media: List[ProductMediaBrief] = Field(default_factory=list)
 
 
 class ProductListMeta(BaseModel):
@@ -62,6 +130,42 @@ class ProductListResponse(BaseModel):
 
 class ProductResponse(BaseModel):
     data: ProductRead
+    errors: List[str] = []
+
+
+class ProductDetailResponse(BaseModel):
+    data: ProductDetailRead
+    errors: List[str] = []
+
+
+class ProductMediaReplace(BaseModel):
+    media_ids: List[str] = Field(default_factory=list)
+
+
+class ProductSpecValueRead(BaseModel):
+    attribute_id: str
+    attribute_code: str
+    attribute_name: str
+    value: str
+
+
+class ProductSpecsRead(BaseModel):
+    attribute_profile_id: Optional[str] = None
+    values: List[ProductSpecValueRead] = Field(default_factory=list)
+
+
+class ProductSpecValueUpsert(BaseModel):
+    attribute_id: str
+    value: str = ""
+
+
+class ProductSpecsReplace(BaseModel):
+    attribute_profile_id: Optional[str] = None
+    values: List[ProductSpecValueUpsert] = Field(default_factory=list)
+
+
+class ProductSpecsResponse(BaseModel):
+    data: ProductSpecsRead
     errors: List[str] = []
 
 

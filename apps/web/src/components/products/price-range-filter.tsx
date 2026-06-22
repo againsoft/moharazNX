@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { products } from "@/lib/mock-data/products";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,16 +10,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const prices = products.map((p) => p.price);
 export const PRICE_FLOOR = 0;
-export const PRICE_CEILING = Math.ceil(Math.max(...prices) / 1000) * 1000;
 export const PRICE_STEP = 100;
+export const DEFAULT_PRICE_CEILING = 200000;
 
 type Props = {
   valueMin: string;
   valueMax: string;
   onChange: (min: string, max: string) => void;
   className?: string;
+  /** Dynamic ceiling from loaded product list. */
+  priceCeiling?: number;
 };
 
 function parseValue(raw: string, fallback: number) {
@@ -87,13 +87,13 @@ function DualRangeSlider({
   );
 }
 
-export function PriceRangeFilter({ valueMin, valueMax, onChange, className }: Props) {
+export function PriceRangeFilter({ valueMin, valueMax, onChange, className, priceCeiling = DEFAULT_PRICE_CEILING }: Props) {
   const [open, setOpen] = useState(false);
 
   const isActive = valueMin !== "" || valueMax !== "";
 
   const low = parseValue(valueMin, PRICE_FLOOR);
-  const high = parseValue(valueMax, PRICE_CEILING);
+  const high = parseValue(valueMax, priceCeiling);
 
   const label = useMemo(() => {
     if (!isActive) return "Price";
@@ -106,7 +106,7 @@ export function PriceRangeFilter({ valueMin, valueMax, onChange, className }: Pr
 
   const applyRange = (nextLow: number, nextHigh: number) => {
     const atFloor = nextLow <= PRICE_FLOOR;
-    const atCeiling = nextHigh >= PRICE_CEILING;
+    const atCeiling = nextHigh >= priceCeiling;
     if (atFloor && atCeiling) {
       onChange("", "");
       return;
@@ -138,7 +138,7 @@ export function PriceRangeFilter({ valueMin, valueMax, onChange, className }: Pr
         </p>
         <DualRangeSlider
           min={PRICE_FLOOR}
-          max={PRICE_CEILING}
+          max={priceCeiling}
           low={low}
           high={high}
           step={PRICE_STEP}
@@ -146,7 +146,7 @@ export function PriceRangeFilter({ valueMin, valueMax, onChange, className }: Pr
         />
         <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
           <span>{formatCurrency(PRICE_FLOOR)}</span>
-          <span>{formatCurrency(PRICE_CEILING)}</span>
+          <span>{formatCurrency(priceCeiling)}</span>
         </div>
         {isActive && (
           <Button variant="ghost" size="sm" className="mt-2 h-7 w-full text-xs" onClick={clear}>
