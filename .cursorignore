@@ -1,0 +1,10 @@
+apps/web/.next/
+apps/web/node_modules/
+apps/api/.venv/
+**/__pycache__/
+.env
+.env.local
+apps/api/.env
+apps/web/.env.local
+.DS_Store
+../againerp/

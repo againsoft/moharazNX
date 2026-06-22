@@ -1,0 +1,34 @@
+import { apiFetch } from "@/lib/api/client";
+import type { AdminUser } from "@/lib/store/admin-auth-store";
+
+export type ApiUserListResponse = {
+  data: AdminUser[];
+  meta: { count: number };
+};
+
+export type ApiUserResponse = {
+  data: AdminUser;
+};
+
+export type ApiUserUpdate = {
+  role?: string;
+  is_active?: boolean;
+};
+
+export async function fetchAuthUsers(): Promise<AdminUser[]> {
+  const res = await apiFetch<ApiUserListResponse>("/api/v1/auth/users");
+  return res.data;
+}
+
+export async function fetchAuthUser(userId: string): Promise<AdminUser> {
+  const res = await apiFetch<ApiUserResponse>(`/api/v1/auth/users/${userId}`);
+  return res.data;
+}
+
+export async function updateAuthUser(userId: string, payload: ApiUserUpdate): Promise<AdminUser> {
+  const res = await apiFetch<ApiUserResponse>(`/api/v1/auth/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}

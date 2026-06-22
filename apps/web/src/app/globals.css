@@ -1,0 +1,443 @@
+@import "tailwindcss";
+@import "../design-system/css/tokens.css";
+@import "ag-grid-community/styles/ag-grid.css";
+@import "ag-grid-community/styles/ag-theme-quartz.css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+  --color-surface: var(--color-surface);
+  --font-sans: var(--font-geist-sans);
+}
+
+html {
+  font-size: 14px;
+}
+
+*,
+*::before,
+*::after {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* Shared control border — matches catalog/products live search */
+.control-border {
+  border: 1px solid var(--input);
+}
+
+.ag-theme-quartz {
+  --ag-font-family: inherit;
+  --ag-font-size: 12px;
+  --ag-grid-size: 4px;
+  --ag-row-height: 34px;
+  --ag-header-height: 34px;
+  --ag-list-item-height: 28px;
+  --ag-active-color: var(--primary);
+  --ag-border-color: var(--input);
+  --ag-secondary-border-color: var(--input);
+  --ag-background-color: var(--card);
+  --ag-foreground-color: var(--foreground);
+  --ag-header-background-color: var(--muted);
+  --ag-row-border-color: var(--input);
+  --ag-header-column-separator-color: var(--input);
+  --ag-input-border-color: var(--input);
+  --ag-checkbox-background-color: var(--card);
+  --ag-checkbox-unchecked-color: var(--muted-foreground);
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 8%, transparent);
+  --ag-selected-row-background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  --ag-menu-background-color: var(--card);
+  --ag-panel-background-color: var(--card);
+  --ag-popup-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --ag-range-selection-border-color: color-mix(in srgb, var(--primary) 32%, var(--input));
+  --ag-input-focus-border-color: color-mix(in srgb, var(--primary) 32%, var(--input));
+  --ag-input-focus-box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
+  --ag-range-selection-background-color: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+/* Dark mode — match app tokens; works with ag-theme-quartz-dark class */
+.dark .ag-theme-quartz,
+.dark .ag-theme-quartz.ag-theme-quartz-dark,
+.ag-theme-quartz.ag-theme-quartz-dark {
+  color-scheme: dark;
+  --ag-active-color: var(--primary);
+  --ag-background-color: var(--card);
+  --ag-foreground-color: var(--foreground);
+  --ag-border-color: var(--input);
+  --ag-secondary-border-color: var(--input);
+  --ag-header-background-color: var(--muted);
+  --ag-tooltip-background-color: var(--muted);
+  --ag-control-panel-background-color: var(--muted);
+  --ag-row-border-color: var(--input);
+  --ag-header-column-separator-color: var(--input);
+  --ag-input-border-color: var(--input);
+  --ag-input-background-color: var(--background);
+  --ag-input-disabled-background-color: color-mix(in srgb, var(--card), var(--foreground) 6%);
+  --ag-input-disabled-border-color: var(--input);
+  --ag-checkbox-background-color: var(--card);
+  --ag-checkbox-unchecked-color: var(--muted-foreground);
+  --ag-checkbox-border-color: var(--input);
+  --ag-odd-row-background-color: color-mix(in srgb, var(--card), #000 8%);
+  --ag-row-hover-color: color-mix(in srgb, var(--primary) 14%, transparent);
+  --ag-selected-row-background-color: color-mix(in srgb, var(--primary) 18%, transparent);
+  --ag-menu-background-color: var(--card);
+  --ag-menu-border-color: var(--input);
+  --ag-panel-background-color: var(--card);
+  --ag-panel-border-color: var(--input);
+  --ag-modal-overlay-background-color: rgba(0, 0, 0, 0.55);
+  --ag-card-shadow: 0 1px 12px rgba(0, 0, 0, 0.45);
+  --ag-popup-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  --ag-icon-font-color: var(--muted-foreground);
+  --ag-disabled-foreground-color: color-mix(in srgb, var(--foreground) 45%, transparent);
+  --ag-range-selection-border-color: color-mix(in srgb, var(--primary) 38%, var(--input));
+  --ag-input-focus-border-color: color-mix(in srgb, var(--primary) 38%, var(--input));
+  --ag-input-focus-box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 14%, transparent);
+  --ag-range-selection-background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+
+.dark .ag-theme-quartz .ag-paging-panel,
+.dark .ag-theme-quartz-dark .ag-paging-panel {
+  border-top-color: var(--input);
+  background-color: var(--card);
+  color: var(--foreground);
+}
+
+.dark .ag-theme-quartz .ag-picker-field-wrapper,
+.dark .ag-theme-quartz-dark .ag-picker-field-wrapper,
+.dark .ag-theme-quartz .ag-select,
+.dark .ag-theme-quartz-dark .ag-select {
+  background-color: var(--background);
+  border-color: var(--input);
+  color: var(--foreground);
+}
+
+.dark .ag-theme-quartz .ag-header-cell-text,
+.dark .ag-theme-quartz-dark .ag-header-cell-text {
+  color: var(--foreground);
+}
+
+.dark .ag-theme-quartz .ag-cell,
+.dark .ag-theme-quartz-dark .ag-cell {
+  color: var(--foreground);
+}
+
+/* Force dark surfaces — overrides AG Grid v35 default light programmatic theme */
+.dark .ag-theme-quartz .ag-root-wrapper,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-root-wrapper,
+.dark .ag-theme-quartz .ag-body-viewport,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-body-viewport,
+.dark .ag-theme-quartz .ag-center-cols-viewport,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-center-cols-viewport,
+.dark .ag-theme-quartz .ag-header,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-header,
+.dark .ag-theme-quartz .ag-row,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-row {
+  background-color: var(--card);
+}
+
+.dark .ag-theme-quartz .ag-header,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-header {
+  background-color: var(--muted);
+}
+
+.dark .ag-theme-quartz .ag-row-odd,
+.dark .ag-theme-quartz.ag-theme-quartz-dark .ag-row-odd {
+  background-color: color-mix(in srgb, var(--card), #000 8%);
+}
+
+/* Column resize handle — easier to grab */
+.ag-theme-quartz .ag-header-cell-resize,
+.ag-theme-quartz-dark .ag-header-cell-resize {
+  width: 6px;
+  cursor: col-resize;
+}
+
+/* Duplicate / reserved slug — live grid alert */
+.ag-theme-quartz .ag-cell.slug-cell-invalid,
+.ag-theme-quartz-dark .ag-cell.slug-cell-invalid {
+  box-shadow: inset 0 0 0 1.5px hsl(var(--destructive));
+  background-color: hsl(var(--destructive) / 0.08);
+}
+
+.ag-theme-quartz .ag-header-cell-resize::after,
+.ag-theme-quartz-dark .ag-header-cell-resize::after {
+  opacity: 0.35;
+}
+
+.ag-theme-quartz .ag-header-cell:hover .ag-header-cell-resize::after,
+.ag-theme-quartz-dark .ag-header-cell:hover .ag-header-cell-resize::after {
+  opacity: 0.7;
+}
+
+.ag-theme-quartz .ag-header-cell,
+.ag-theme-quartz-dark .ag-header-cell {
+  cursor: grab;
+}
+
+.ag-theme-quartz .ag-header-cell:active,
+.ag-theme-quartz-dark .ag-header-cell:active {
+  cursor: grabbing;
+}
+
+.ag-theme-quartz .ag-header-cell.product-grid-select-col,
+.ag-theme-quartz-dark .ag-header-cell.product-grid-select-col,
+.ag-theme-quartz .ag-cell.product-grid-select-col,
+.ag-theme-quartz-dark .ag-cell.product-grid-select-col {
+  padding-left: 8px;
+  padding-right: 0;
+  justify-content: center;
+}
+
+.ag-theme-quartz .ag-header-cell.product-grid-select-col .ag-header-cell-comp-wrapper,
+.ag-theme-quartz-dark .ag-header-cell.product-grid-select-col .ag-header-cell-comp-wrapper {
+  justify-content: center;
+}
+
+.ag-theme-quartz .ag-header-cell.product-grid-icon-col,
+.ag-theme-quartz-dark .ag-header-cell.product-grid-icon-col,
+.ag-theme-quartz .ag-cell.product-grid-icon-col,
+.ag-theme-quartz-dark .ag-cell.product-grid-icon-col {
+  padding-left: 0;
+  padding-right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Category row drag */
+.ag-theme-quartz .ag-row,
+.ag-theme-quartz-dark .ag-row {
+  cursor: grab;
+}
+
+.ag-theme-quartz .ag-row-dragging,
+.ag-theme-quartz-dark .ag-row-dragging {
+  cursor: grabbing;
+  opacity: 0.85;
+}
+
+.ag-theme-quartz .ag-row-drag,
+.ag-theme-quartz-dark .ag-row-drag {
+  cursor: grab;
+}
+
+/* Dual-handle price range slider */
+.dual-range-thumb {
+  pointer-events: none;
+  height: 1.25rem;
+}
+
+.dual-range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  background: var(--background);
+  cursor: grab;
+  margin-top: -5px;
+}
+
+.dual-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  background: var(--background);
+  cursor: grab;
+}
+
+.dual-range-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 4px;
+}
+
+.dual-range-thumb::-moz-range-track {
+  background: transparent;
+  height: 4px;
+}
+
+/* Compact page typography */
+.page-title {
+  @apply text-lg font-semibold tracking-tight;
+}
+
+.page-subtitle {
+  @apply text-[11px] text-muted-foreground;
+}
+
+/* Business Settings — launcher & category workspace */
+.settings-hero {
+  isolation: isolate;
+}
+
+.settings-category-card:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.settings-save-bar {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Order print documents — standalone popup (no admin shell) */
+@media print {
+  .print-hide {
+    display: none !important;
+  }
+
+  .print-app-root {
+    background: white !important;
+  }
+
+  .order-print-document {
+    box-shadow: none !important;
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  @page {
+    margin: 10mm;
+    size: A4;
+  }
+}
+
+@media screen {
+  .print-app-root {
+    background: #ececec;
+  }
+}
+
+/* Storefront — MoharazNX customer shop theme */
+.storefront {
+  --radius: 0.375rem;
+  --sf-max: 90rem;
+  --primary: #eb6626;
+  --primary-foreground: #ffffff;
+  --ring: color-mix(in srgb, #eb6626 35%, var(--border));
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.storefront h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+@media (min-width: 640px) {
+  .storefront h1 {
+    font-size: 1.5rem;
+  }
+}
+
+.storefront h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.storefront .sf-container {
+  width: 100%;
+  max-width: var(--sf-max);
+  margin-inline: auto;
+}
+
+.storefront .scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.storefront .scrollbar-thin::-webkit-scrollbar {
+  height: 4px;
+}
+
+.storefront .scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+/* Catalog price range — dual-thumb slider */
+.storefront .catalog-price-range-thumb {
+  height: 1.5rem;
+  margin: 0;
+  pointer-events: none;
+}
+
+.storefront .catalog-price-range-min {
+  z-index: 20;
+}
+
+.storefront .catalog-price-range-max {
+  z-index: 10;
+}
+
+.storefront .catalog-price-range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: auto;
+  position: relative;
+  height: 1.125rem;
+  width: 1.125rem;
+  margin-top: -0.375rem;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--primary));
+  background: hsl(var(--background));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  cursor: grab;
+}
+
+.storefront .catalog-price-range-thumb:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+.storefront .catalog-price-range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 1.125rem;
+  width: 1.125rem;
+  border-radius: 9999px;
+  border: 2px solid hsl(var(--primary));
+  background: hsl(var(--background));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.15);
+  cursor: grab;
+}
+
+.storefront .catalog-price-range-thumb::-webkit-slider-runnable-track {
+  height: 0.375rem;
+  background: transparent;
+}
+
+.storefront .catalog-price-range-thumb::-moz-range-track {
+  height: 0.375rem;
+  background: transparent;
+}

@@ -1,0 +1,11 @@
+export { WorkspaceShell } from "./workspace-shell";
+export { WorkspaceHeader } from "./workspace-header";
+export { WorkspaceSidebar } from "./workspace-sidebar";
+export { WorkspaceModuleNav } from "./workspace-module-nav";
+export { WorkspaceMainContent } from "./workspace-main-content";
+export { WorkspaceUtilityPanel } from "./workspace-utility-panel";
+export { WorkspaceMobileNav } from "./workspace-mobile-nav";
+export { DashboardPlaceholder } from "./placeholders/dashboard-placeholder";
+export { ModulePlaceholder } from "./placeholders/module-placeholder";
+export { WorkspaceEmptyState } from "./states/empty-state";
+export { WorkspaceLoadingState } from "./states/loading-state";

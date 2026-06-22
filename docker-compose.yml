@@ -1,0 +1,25 @@
+# MoharazNX local infrastructure — AgainERP TECHNOLOGY_CONSTITUTION (PostgreSQL + Redis later)
+# Usage: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: moharaznx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: moharaznx
+      POSTGRES_PASSWORD: moharaznx
+      POSTGRES_DB: moharaznx
+    ports:
+      # Host 5433 → avoids conflict with local PostgreSQL on 5432 (macOS)
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moharaznx -d moharaznx"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

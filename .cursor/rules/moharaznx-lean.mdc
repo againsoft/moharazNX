@@ -1,0 +1,25 @@
+---
+description: MoharazNX lean development — minimize tokens per roadmap step
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+# MoharazNX lean mode
+
+Before coding, read `docs/ROADMAP.md` only (not full chat history).
+
+## Per-step scope
+- Backend: 1–2 tables, list + get + patch, seed in `init_db.py`
+- Frontend: `lib/api/<domain>.ts`, `use-<domain>.ts`, wire list + detail only
+- Skip dashboard wiring unless user asks
+- Skip new STEP*.md files; append short block to `docs/CHANGELOG.md`
+
+## Do not
+- Read entire `mock-data/*.ts` files (grep types / read target component only)
+- Read `../againerp/` docs unless blocked
+- Run full `npm run build` unless user asks
+- Explore with broad Task/explore agents for known patterns
+
+## Copy from latest similar step
+Orders → Customers → next commerce module: same hook + ApiConnectionBadge pattern.

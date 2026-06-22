@@ -1,0 +1,43 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import type { Product } from "@/lib/mock-data/products";
+import { fetchCatalogProduct } from "@/lib/api/use-catalog-products";
+
+type UseCatalogProductState = {
+  product: Product | null;
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+};
+
+export function useCatalogProduct(id: string | null | undefined): UseCatalogProductState {
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(Boolean(id));
+  const [error, setError] = useState<string | null>(null);
+
+  const refetch = useCallback(async () => {
+    if (!id) {
+      setProduct(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      setProduct(await fetchCatalogProduct(id));
+    } catch (err) {
+      setProduct(null);
+      setError(err instanceof Error ? err.message : "Product not found");
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { product, loading, error, refetch };
+}

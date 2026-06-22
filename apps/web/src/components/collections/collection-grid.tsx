@@ -1,0 +1,752 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AgGridReact } from "ag-grid-react";
+import type { ColDef, ICellRendererParams, RowDragEndEvent } from "ag-grid-community";
+import * as Dialog from "@radix-ui/react-dialog";
+import {
+  Archive,
+  Filter,
+  GripVertical,
+  MoreHorizontal,
+  MousePointerClick,
+  Pencil,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import {
+  COLLECTION_TYPE_LABELS,
+  type CollectionStatus,
+  type CollectionType,
+  type ProductCollection,
+} from "@/lib/mock-data/collections";
+import { useCollectionStore } from "@/lib/store/collection-store";
+import { cn } from "@/lib/utils";
+import { useIsDark } from "@/lib/use-is-dark";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { SlugCellEditor } from "@/components/data-grid/slug-cell-editor";
+import { slugCellClassRules } from "@/components/data-grid/slug-cell-rules";
+import { slugHasError, validateSlug } from "@/lib/url-slug/validate-slug";
+import { CollectionFormDialog } from "@/components/collections/collection-form-dialog";
+import { CollectionMobileCards } from "@/components/collections/collection-mobile-cards";
+
+const PAGE_SIZE = 25;
+
+const COLUMN_KEYS = ["hero", "slug", "type", "rules", "products", "schedule", "status", "updated"] as const;
+type ColumnKey = (typeof COLUMN_KEYS)[number];
+
+const COLUMN_LABELS: Record<ColumnKey, string> = {
+  hero: "Hero",
+  slug: "Slug",
+  type: "Type",
+  rules: "Rules",
+  products: "Products",
+  schedule: "Schedule",
+  status: "Status",
+  updated: "Updated",
+};
+
+const DEFAULT_VISIBLE: Record<ColumnKey, boolean> = {
+  hero: true,
+  slug: true,
+  type: true,
+  rules: true,
+  products: true,
+  schedule: false,
+  status: true,
+  updated: true,
+};
+
+const LIVE_EDIT_TOGGLES = ["name", "slug", "status"] as const;
+type LiveEditKey = (typeof LIVE_EDIT_TOGGLES)[number];
+
+const LIVE_EDIT_LABELS: Record<LiveEditKey, string> = {
+  name: "Name",
+  slug: "Slug",
+  status: "Status",
+};
+
+const LIVE_EDIT_HINTS: Record<LiveEditKey, string> = {
+  name: "Double-click cell to edit in grid",
+  slug: "Double-click cell to edit in grid",
+  status: "Click status badge to cycle",
+};
+
+const DEFAULT_LIVE_EDIT: Record<LiveEditKey, boolean> = {
+  name: true,
+  slug: true,
+  status: true,
+};
+
+const FILTER_KEYS = ["search", "type", "status"] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
+
+const FILTER_LABELS: Record<FilterKey, string> = {
+  search: "Search",
+  type: "Type",
+  status: "Status",
+};
+
+const FILTER_HINTS: Record<FilterKey, string> = {
+  search: "Name, slug, rules diye khujun",
+  type: "Collection type filter",
+  status: "Lifecycle status filter",
+};
+
+const DEFAULT_VISIBLE_FILTERS: Record<FilterKey, boolean> = {
+  search: true,
+  type: true,
+  status: false,
+};
+
+type FilterState = {
+  search: string;
+  type: string;
+  status: string;
+};
+
+const DEFAULT_FILTERS: FilterState = {
+  search: "",
+  type: "all",
+  status: "all",
+};
+
+const STATUS_CYCLE: CollectionStatus[] = ["draft", "active", "inactive", "archived"];
+
+function applyFilters(rows: ProductCollection[], f: FilterState) {
+  const q = f.search.toLowerCase().trim();
+  return rows.filter((c) => {
+    if (
+      q &&
+      !c.name.toLowerCase().includes(q) &&
+      !c.slug.toLowerCase().includes(q) &&
+      !c.ruleSummary.toLowerCase().includes(q)
+    ) {
+      return false;
+    }
+    if (f.type !== "all" && c.type !== f.type) return false;
+    if (f.status !== "all" && c.status !== f.status) return false;
+    return true;
+  });
+}
+
+function reorderCollectionIds(
+  collections: ProductCollection[],
+  draggedId: string,
+  overId: string,
+): string[] | null {
+  if (draggedId === overId) return null;
+  const sorted = [...collections].sort((a, b) => a.sortOrder - b.sortOrder);
+  const ids = sorted.map((c) => c.id);
+  const from = ids.indexOf(draggedId);
+  const to = ids.indexOf(overId);
+  if (from < 0 || to < 0) return null;
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, draggedId);
+  return next;
+}
+
+function statusBadgeClass(status: CollectionStatus) {
+  if (status === "active") return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+  if (status === "draft") return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+  return "bg-muted text-muted-foreground";
+}
+
+type Props = {
+  className?: string;
+  addTrigger?: number;
+};
+
+export function CollectionGrid({ className, addTrigger = 0 }: Props) {
+  const isDark = useIsDark();
+  const gridRef = useRef<AgGridReact<ProductCollection>>(null);
+  const collections = useCollectionStore((s) => s.collections);
+  const getDisplayOrder = useCollectionStore((s) => s.getDisplayOrder);
+  const upsertCollection = useCollectionStore((s) => s.upsertCollection);
+  const patchCollection = useCollectionStore((s) => s.patchCollection);
+  const reorderCollections = useCollectionStore((s) => s.reorderCollections);
+  const deleteCollections = useCollectionStore((s) => s.deleteCollections);
+
+  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [editCollection, setEditCollection] = useState<ProductCollection | null>(null);
+  const [page, setPage] = useState(0);
+  const [selected, setSelected] = useState<ProductCollection[]>([]);
+  const [columnSheetOpen, setColumnSheetOpen] = useState(false);
+  const [visibleCols, setVisibleCols] = useState(DEFAULT_VISIBLE);
+  const [liveEditSheetOpen, setLiveEditSheetOpen] = useState(false);
+  const [liveEdit, setLiveEdit] = useState(DEFAULT_LIVE_EDIT);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [visibleFilters, setVisibleFilters] = useState(DEFAULT_VISIBLE_FILTERS);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTargets, setDeleteTargets] = useState<ProductCollection[]>([]);
+
+  const ordered = useMemo(() => getDisplayOrder(), [collections, getDisplayOrder]);
+  const filtered = useMemo(() => applyFilters(ordered, filters), [ordered, filters]);
+
+  const openCreate = useCallback(() => {
+    setFormMode("create");
+    setEditCollection(null);
+    setFormOpen(true);
+  }, []);
+
+  const openEdit = useCallback((collection: ProductCollection) => {
+    setFormMode("edit");
+    setEditCollection(collection);
+    setFormOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (addTrigger > 0) openCreate();
+  }, [addTrigger, openCreate]);
+
+  const cycleStatus = useCallback(
+    (collection: ProductCollection) => {
+      const idx = STATUS_CYCLE.indexOf(collection.status);
+      const next = STATUS_CYCLE[(idx + 1) % STATUS_CYCLE.length];
+      patchCollection(collection.id, { status: next });
+    },
+    [patchCollection],
+  );
+
+  const archiveCollection = useCallback(
+    (collection: ProductCollection) => {
+      if (collection.isSystem) {
+        toast.error("System collections cannot be archived");
+        return;
+      }
+      patchCollection(collection.id, { status: "archived" });
+      toast.success(`Archived ${collection.name}`);
+    },
+    [patchCollection],
+  );
+
+  const bulkUpdateStatus = useCallback(
+    (targets: ProductCollection[], status: CollectionStatus, label: string) => {
+      const ids = new Set(targets.map((t) => t.id));
+      targets.forEach((t) => {
+        if (!t.isSystem || status !== "archived") {
+          if (ids.has(t.id)) patchCollection(t.id, { status });
+        }
+      });
+      toast.success(`${label} (${targets.length})`);
+      setSelected([]);
+    },
+    [patchCollection],
+  );
+
+  const openDeleteConfirm = useCallback((targets: ProductCollection[]) => {
+    const deletable = targets.filter((t) => !t.isSystem);
+    if (deletable.length === 0) {
+      toast.error("System collections cannot be deleted");
+      return;
+    }
+    setDeleteTargets(deletable);
+    setDeleteOpen(true);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    deleteCollections(deleteTargets.map((t) => t.id));
+    toast.success(
+      `Deleted ${deleteTargets.length} collection${deleteTargets.length > 1 ? "s" : ""}`,
+    );
+    setDeleteOpen(false);
+    setDeleteTargets([]);
+    setSelected([]);
+  }, [deleteTargets, deleteCollections]);
+
+  const onCellValueChanged = useCallback(
+    (e: { data: ProductCollection; colDef: { field?: string } }) => {
+      const field = e.colDef.field;
+      if (!field || !e.data?.id) return;
+      if (field === "slug" && slugHasError(e.data.slug, { id: e.data.id })) {
+        const validation = validateSlug(e.data.slug, { id: e.data.id });
+        toast.error(validation.message ?? "Slug already in use");
+        return;
+      }
+      patchCollection(e.data.id, {
+        [field]: e.data[field as keyof ProductCollection],
+      } as Partial<ProductCollection>);
+      toast.success(`Updated ${field}`);
+    },
+    [patchCollection],
+  );
+
+  const StatusCell = useCallback(
+    ({ data }: ICellRendererParams<ProductCollection>) => {
+      if (!data) return null;
+      const label = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+      if (!liveEdit.status) {
+        return <span className={cn("text-[10px] capitalize", statusBadgeClass(data.status))}>{label}</span>;
+      }
+      return (
+        <button
+          type="button"
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-medium capitalize transition-colors",
+            statusBadgeClass(data.status),
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            cycleStatus(data);
+          }}
+        >
+          {label}
+        </button>
+      );
+    },
+    [liveEdit.status, cycleStatus],
+  );
+
+  const TypeCell = useCallback(({ data }: ICellRendererParams<ProductCollection>) => {
+    if (!data) return null;
+    return (
+      <Badge variant="outline" className="max-w-full truncate text-[10px] font-normal">
+        {COLLECTION_TYPE_LABELS[data.type]}
+      </Badge>
+    );
+  }, []);
+
+  const handleSave = (data: Partial<ProductCollection>) => {
+    if (formMode === "create") {
+      upsertCollection(data);
+    } else if (editCollection) {
+      upsertCollection({ id: editCollection.id, ...data });
+    }
+  };
+
+  const onRowDragEnd = useCallback(
+    (e: RowDragEndEvent<ProductCollection>) => {
+      const dragged = e.node.data;
+      const over = e.overNode?.data;
+      if (!dragged || !over) return;
+
+      const orderedIds = reorderCollectionIds(collections, dragged.id, over.id);
+      if (!orderedIds) {
+        e.api.setGridOption("rowData", filtered);
+        return;
+      }
+
+      reorderCollections(orderedIds);
+      toast.success("Display order updated");
+    },
+    [collections, filtered, reorderCollections],
+  );
+
+  const RowActions = useCallback(
+    ({ data }: ICellRendererParams<ProductCollection>) => {
+      if (!data) return null;
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openEdit(data)}>
+              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+            </DropdownMenuItem>
+            {!data.isSystem && (
+              <DropdownMenuItem onClick={() => archiveCollection(data)} className="text-destructive">
+                <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    },
+    [openEdit, archiveCollection],
+  );
+
+  const columnDefs = useMemo<ColDef<ProductCollection>[]>(
+    () => [
+      {
+        headerCheckboxSelection: true,
+        checkboxSelection: true,
+        width: 32,
+        maxWidth: 32,
+        pinned: "left",
+        resizable: false,
+        suppressMovable: true,
+        suppressHeaderMenuButton: true,
+      },
+      {
+        rowDrag: true,
+        width: 36,
+        maxWidth: 36,
+        pinned: "left",
+        resizable: false,
+        suppressMovable: true,
+        suppressHeaderMenuButton: true,
+        headerComponent: () => (
+          <GripVertical className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
+        ),
+      },
+      {
+        colId: "hero",
+        field: "heroImageUrl",
+        headerName: "",
+        width: 52,
+        hide: !visibleCols.hero,
+        resizable: false,
+        suppressMovable: true,
+        sortable: false,
+        suppressHeaderMenuButton: true,
+        cellRenderer: (p: ICellRendererParams<ProductCollection>) =>
+          p.data?.heroImageUrl ? (
+            <img src={p.data.heroImageUrl} alt="" className="h-7 w-10 rounded object-cover" />
+          ) : (
+            <span className="inline-block h-7 w-10 rounded bg-muted" />
+          ),
+      },
+      {
+        field: "name",
+        headerName: "Name",
+        width: 200,
+        minWidth: 140,
+        editable: liveEdit.name,
+        tooltipField: "name",
+        cellClass: "font-medium text-foreground",
+      },
+      {
+        field: "slug",
+        headerName: "Slug",
+        width: 160,
+        hide: !visibleCols.slug,
+        editable: liveEdit.slug,
+        tooltipField: "slug",
+        cellEditor: liveEdit.slug ? SlugCellEditor : undefined,
+        cellClassRules: slugCellClassRules,
+      },
+      {
+        colId: "type",
+        field: "type",
+        headerName: "Type",
+        width: 130,
+        hide: !visibleCols.type,
+        cellRenderer: TypeCell,
+        suppressHeaderMenuButton: true,
+      },
+      {
+        colId: "rules",
+        field: "ruleSummary",
+        headerName: "Rules",
+        width: 220,
+        hide: !visibleCols.rules,
+        tooltipField: "ruleSummary",
+        cellClass: "text-muted-foreground text-xs",
+      },
+      {
+        field: "productCount",
+        headerName: "Products",
+        width: 88,
+        hide: !visibleCols.products,
+      },
+      {
+        colId: "schedule",
+        headerName: "Schedule",
+        width: 140,
+        hide: !visibleCols.schedule,
+        valueGetter: (p) => {
+          const s = p.data?.scheduleStart;
+          const e = p.data?.scheduleEnd;
+          if (!s && !e) return "—";
+          if (s && e) return `${s} → ${e}`;
+          return s ?? e ?? "—";
+        },
+      },
+      {
+        colId: "status",
+        field: "status",
+        headerName: "Status",
+        width: 96,
+        hide: !visibleCols.status,
+        cellRenderer: StatusCell,
+        suppressHeaderMenuButton: true,
+      },
+      {
+        colId: "updated",
+        field: "updatedAt",
+        headerName: "Updated",
+        width: 100,
+        hide: !visibleCols.updated,
+      },
+      {
+        headerName: "",
+        width: 48,
+        pinned: "right",
+        resizable: false,
+        suppressMovable: true,
+        cellRenderer: RowActions,
+        sortable: false,
+        suppressHeaderMenuButton: true,
+      },
+    ],
+    [RowActions, visibleCols, liveEdit, StatusCell, TypeCell],
+  );
+
+  const pageStart = page * PAGE_SIZE + 1;
+  const pageEnd = Math.min((page + 1) * PAGE_SIZE, filtered.length);
+
+  const toggleVisibleFilter = (key: FilterKey, enabled: boolean) => {
+    setVisibleFilters((v) => ({ ...v, [key]: enabled }));
+    if (!enabled) {
+      setFilters((f) => ({
+        ...f,
+        ...(key === "search" ? { search: "" } : {}),
+        ...(key === "type" ? { type: "all" } : {}),
+        ...(key === "status" ? { status: "all" } : {}),
+      }));
+    }
+  };
+
+  return (
+    <div className={cn("flex min-h-0 flex-col gap-3", className)}>
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {visibleFilters.search && (
+          <Input
+            placeholder="Search name, slug, rules…"
+            value={filters.search}
+            onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+            className="max-w-[220px]"
+          />
+        )}
+        {visibleFilters.type && (
+          <Select
+            value={filters.type}
+            onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+            className="w-[160px]"
+          >
+            <option value="all">All types</option>
+            {(Object.keys(COLLECTION_TYPE_LABELS) as CollectionType[]).map((t) => (
+              <option key={t} value={t}>
+                {COLLECTION_TYPE_LABELS[t]}
+              </option>
+            ))}
+          </Select>
+        )}
+        {visibleFilters.status && (
+          <Select
+            value={filters.status}
+            onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+            className="w-[130px]"
+          >
+            <option value="all">All status</option>
+            {STATUS_CYCLE.map((s) => (
+              <option key={s} value={s}>
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </option>
+            ))}
+          </Select>
+        )}
+
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          {selected.length > 0 && (
+            <>
+              <span className="text-xs text-muted-foreground">{selected.length} selected</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => bulkUpdateStatus(selected, "active", "Activated")}
+              >
+                Activate
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => bulkUpdateStatus(selected, "inactive", "Deactivated")}
+              >
+                Deactivate
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive"
+                onClick={() => openDeleteConfirm(selected)}
+              >
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+              </Button>
+            </>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setFilterSheetOpen(true)}>
+            <Filter className="mr-1.5 h-3.5 w-3.5" /> Filters
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setColumnSheetOpen(true)}>
+            <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" /> Columns
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setLiveEditSheetOpen(true)}>
+            <MousePointerClick className="mr-1.5 h-3.5 w-3.5" /> Live Edit
+          </Button>
+        </div>
+      </div>
+
+      <div className="hidden min-h-0 flex-1 lg:block">
+        <div
+          className={cn("ag-theme-quartz h-full min-h-[320px] rounded-lg border border-input", isDark && "ag-theme-quartz-dark")}
+        >
+          <AgGridReact<ProductCollection>
+            theme="legacy"
+            ref={gridRef}
+            rowData={filtered}
+            columnDefs={columnDefs}
+            defaultColDef={{
+              sortable: true,
+              resizable: true,
+              filter: false,
+              suppressHeaderMenuButton: true,
+            }}
+            rowSelection="multiple"
+            suppressRowClickSelection
+            animateRows
+            rowDragManaged
+            onRowDragEnd={onRowDragEnd}
+            onCellValueChanged={onCellValueChanged}
+            onSelectionChanged={() => {
+              const rows: ProductCollection[] = [];
+              gridRef.current?.api.forEachNodeAfterFilterAndSort((node) => {
+                if (node.isSelected() && node.data) rows.push(node.data);
+              });
+              setSelected(rows);
+            }}
+            pagination
+            paginationPageSize={PAGE_SIZE}
+            onPaginationChanged={() => {
+              const api = gridRef.current?.api;
+              if (api) setPage(api.paginationGetCurrentPage());
+            }}
+            getRowId={(p) => p.data.id}
+          />
+        </div>
+        {filtered.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Showing {pageStart}–{pageEnd} of {filtered.length}
+          </p>
+        )}
+      </div>
+
+      <div className="lg:hidden">
+        <CollectionMobileCards
+          collections={filtered}
+          onEdit={openEdit}
+          onArchive={archiveCollection}
+        />
+      </div>
+
+      <CollectionFormDialog
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        mode={formMode}
+        collection={editCollection}
+        onSave={handleSave}
+        onLiveChange={(data) => patchCollection(data.id, data)}
+      />
+
+      <Sheet open={columnSheetOpen} onOpenChange={setColumnSheetOpen}>
+        <SheetContent side="right" className="w-[min(320px,100vw)]">
+          <h2 className="text-sm font-semibold">Columns</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Show or hide grid columns</p>
+          <div className="mt-4 space-y-3">
+            {COLUMN_KEYS.map((key) => (
+              <label key={key} className="flex items-center justify-between gap-2 text-sm">
+                {COLUMN_LABELS[key]}
+                <input
+                  type="checkbox"
+                  checked={visibleCols[key]}
+                  onChange={(e) => setVisibleCols((v) => ({ ...v, [key]: e.target.checked }))}
+                  className="h-4 w-4 rounded border-input"
+                />
+              </label>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={liveEditSheetOpen} onOpenChange={setLiveEditSheetOpen}>
+        <SheetContent side="right" className="w-[min(320px,100vw)]">
+          <h2 className="text-sm font-semibold">Live Edit</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Inline editing in the grid</p>
+          <div className="mt-4 space-y-4">
+            {LIVE_EDIT_TOGGLES.map((key) => (
+              <div key={key}>
+                <label className="flex items-center justify-between gap-2 text-sm font-medium">
+                  {LIVE_EDIT_LABELS[key]}
+                  <input
+                    type="checkbox"
+                    checked={liveEdit[key]}
+                    onChange={(e) => setLiveEdit((v) => ({ ...v, [key]: e.target.checked }))}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                </label>
+                <p className="mt-0.5 text-xs text-muted-foreground">{LIVE_EDIT_HINTS[key]}</p>
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <SheetContent side="right" className="w-[min(320px,100vw)]">
+          <h2 className="text-sm font-semibold">Filters</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Choose which filters appear in the toolbar</p>
+          <div className="mt-4 space-y-4">
+            {FILTER_KEYS.map((key) => (
+              <div key={key}>
+                <label className="flex items-center justify-between gap-2 text-sm font-medium">
+                  {FILTER_LABELS[key]}
+                  <input
+                    type="checkbox"
+                    checked={visibleFilters[key]}
+                    onChange={(e) => toggleVisibleFilter(key, e.target.checked)}
+                    className="h-4 w-4 rounded border-input"
+                  />
+                </label>
+                <p className="mt-0.5 text-xs text-muted-foreground">{FILTER_HINTS[key]}</p>
+              </div>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog.Root open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(400px,95vw)] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-input bg-background p-5 shadow-xl">
+            <Dialog.Title className="text-base font-semibold">Delete collections?</Dialog.Title>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {deleteTargets.length} collection{deleteTargets.length > 1 ? "s" : ""} will be removed.
+              System collections are protected.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={confirmDelete}>
+                Delete
+              </Button>
+            </div>
+            <Dialog.Close asChild>
+              <Button variant="ghost" size="sm" className="absolute right-3 top-3 h-8 w-8 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            </Dialog.Close>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+  );
+}
