@@ -28,7 +28,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://moharaznx:moharaznx@postgres:5432/moharaznx
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002
       APP_ENV: development
       APP_DEBUG: "true"
     volumes:
@@ -43,10 +43,10 @@ services:
     container_name: moharaznx-web
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "3002:3002"
     environment:
-      NEXT_PUBLIC_API_URL: https://moharaznx-production.up.railway.app
-    command: npm run dev -- --hostname 0.0.0.0 --port 3001
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    command: npm run dev -- --hostname 0.0.0.0 --port 3002
     depends_on:
       - api
 

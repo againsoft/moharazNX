@@ -229,8 +229,14 @@ export const workspaceNavGroups: WorkspaceNavGroup[] = [
           { id: "sys.payment", title: "Payment Gateways", href: "/settings/payments" },
           { id: "sys.shipping", title: "Shipping Methods", href: "/settings/shipping" },
           { id: "sys.email", title: "Email / SMS", href: "/settings/notifications" },
-          { id: "sys.users", title: "User Management", href: "/settings/users" },
-          { id: "sys.roles", title: "Roles & Permissions", href: "/settings/roles" },
+          {
+            id: "sys.access",
+            title: "Access",
+            children: [
+              { id: "sys.users", title: "Users", href: "/system/users" },
+              { id: "sys.roles", title: "User Roles", href: "/system/roles" },
+            ],
+          },
           { id: "sys.ai", title: "AI Settings", href: "/settings/ai" },
         ],
       },

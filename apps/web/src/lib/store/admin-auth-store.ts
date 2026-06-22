@@ -6,12 +6,15 @@ import { persist } from "zustand/middleware";
 export type AdminUser = {
   id: string;
   email: string;
+  username: string;
   name: string;
   role: string;
   is_active: boolean;
 };
 
 type AdminAuthState = {
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   user: AdminUser | null;
   token: string | null;
   expiresAt: string | null;
@@ -22,6 +25,8 @@ type AdminAuthState = {
 export const useAdminAuth = create<AdminAuthState>()(
   persist(
     (set) => ({
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
       user: null,
       token: null,
       expiresAt: null,
@@ -31,6 +36,9 @@ export const useAdminAuth = create<AdminAuthState>()(
     {
       name: "moharaznx-admin-auth",
       partialize: (s) => ({ user: s.user, token: s.token, expiresAt: s.expiresAt }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );

@@ -10,7 +10,15 @@ export type ApiUserResponse = {
   data: AdminUser;
 };
 
+export type ApiUserCreate = {
+  email: string;
+  name: string;
+  role: string;
+  password: string;
+};
+
 export type ApiUserUpdate = {
+  name?: string;
   role?: string;
   is_active?: boolean;
 };
@@ -25,10 +33,36 @@ export async function fetchAuthUser(userId: string): Promise<AdminUser> {
   return res.data;
 }
 
+export async function createAuthUser(payload: ApiUserCreate): Promise<AdminUser> {
+  const res = await apiFetch<ApiUserResponse>("/api/v1/auth/users", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  return res.data;
+}
+
 export async function updateAuthUser(userId: string, payload: ApiUserUpdate): Promise<AdminUser> {
   const res = await apiFetch<ApiUserResponse>(`/api/v1/auth/users/${userId}`, {
     method: "PATCH",
     body: JSON.stringify(payload),
   });
+  return res.data;
+}
+
+export async function deleteAuthUser(userId: string): Promise<void> {
+  await apiFetch<void>(`/api/v1/auth/users/${userId}`, { method: "DELETE" });
+}
+
+export type ActivityEntry = {
+  id: string;
+  action: string;
+  detail: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  created_at: string;
+};
+
+export async function fetchUserActivity(userId: string): Promise<ActivityEntry[]> {
+  const res = await apiFetch<{ data: ActivityEntry[] }>(`/api/v1/auth/users/${userId}/activity`);
   return res.data;
 }

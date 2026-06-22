@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AdminUser } from "@/lib/store/admin-auth-store";
-import { fetchAuthUsers, updateAuthUser } from "@/lib/api/auth-users";
+import type { ApiUserCreate } from "@/lib/api/auth-users";
+import { createAuthUser, deleteAuthUser, fetchAuthUsers, updateAuthUser } from "@/lib/api/auth-users";
 
 export function useAuthUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -30,11 +31,24 @@ export function useAuthUsers() {
     void refetch();
   }, [refetch]);
 
-  const patchUser = useCallback(async (userId: string, role: string) => {
-    const updated = await updateAuthUser(userId, { role });
+  const createUser = useCallback(async (payload: ApiUserCreate) => {
+    const created = await createAuthUser(payload);
+    setUsers((prev) => [...prev, created]);
+    setTotal((n) => n + 1);
+    return created;
+  }, []);
+
+  const patchUser = useCallback(async (userId: string, patch: { role?: string; name?: string; is_active?: boolean }) => {
+    const updated = await updateAuthUser(userId, patch);
     setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
     return updated;
   }, []);
 
-  return { users, total, loading, error, refetch, patchUser };
+  const removeUser = useCallback(async (userId: string) => {
+    await deleteAuthUser(userId);
+    setUsers((prev) => prev.filter((u) => u.id !== userId));
+    setTotal((n) => n - 1);
+  }, []);
+
+  return { users, total, loading, error, refetch, createUser, patchUser, removeUser };
 }

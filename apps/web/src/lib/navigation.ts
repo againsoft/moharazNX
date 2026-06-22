@@ -223,8 +223,13 @@ export const sidebarNav: NavItem[] = [
       { title: "Payment Gateways", href: "/settings/payments" },
       { title: "Shipping Methods", href: "/settings/shipping" },
       { title: "Email / SMS", href: "/settings/notifications" },
-      { title: "User Management", href: "/settings/users" },
-      { title: "Roles & Permissions", href: "/settings/roles" },
+      {
+        title: "Access",
+        children: [
+          { title: "Users", href: "/system/users" },
+          { title: "User Roles", href: "/system/roles" },
+        ],
+      },
       { title: "AI Settings", href: "/settings/ai" },
     ],
   },

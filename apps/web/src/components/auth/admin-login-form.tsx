@@ -10,15 +10,17 @@ import { Input } from "@/components/ui/input";
 
 export function AdminLoginForm() {
   const router = useRouter();
+  const hasHydrated = useAdminAuth((s) => s._hasHydrated);
   const { token, setSession } = useAdminAuth();
-  const [email, setEmail] = useState("admin@moharaznx.com");
+  const [email, setEmail] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     if (token) router.replace("/dashboard");
-  }, [token, router]);
+  }, [hasHydrated, token, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +45,13 @@ export function AdminLoginForm() {
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <label htmlFor="email" className="text-sm font-medium text-foreground">
-          Email
+          Email or username
         </label>
         <Input
           id="email"
-          type="email"
+          type="text"
           autoComplete="username"
+          placeholder="admin or admin@moharaznx.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -72,7 +75,7 @@ export function AdminLoginForm() {
         {loading ? "Signing in…" : "Sign in"}
       </Button>
       <p className="text-xs text-muted-foreground text-center">
-        Demo: admin@moharaznx.com / admin123
+        Demo: admin / admin123
       </p>
     </form>
   );

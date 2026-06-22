@@ -15,6 +15,7 @@ class AuthUser(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     company_id: Mapped[str] = mapped_column(String(36), nullable=False, default="default")
     email: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    username: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="admin")

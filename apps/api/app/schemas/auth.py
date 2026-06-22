@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 class UserRead(BaseModel):
     id: str
     email: str
+    username: str
     name: str
     role: str
     is_active: bool
@@ -27,9 +28,21 @@ class UserResponse(BaseModel):
     data: UserRead
 
 
+class UserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+    username: str = Field(min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9._-]+$")
+    name: str = Field(min_length=1, max_length=255)
+    role: str = Field(default="staff")
+    password: str = Field(min_length=6, max_length=128)
+
+
 class UserUpdate(BaseModel):
+    email: Optional[str] = Field(default=None, min_length=3, max_length=255)
+    name: Optional[str] = None
+    username: Optional[str] = Field(default=None, min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9._-]+$")
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    password: Optional[str] = Field(default=None, min_length=6, max_length=128)
 
 
 class LoginRequest(BaseModel):
