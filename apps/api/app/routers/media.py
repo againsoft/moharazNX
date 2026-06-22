@@ -226,7 +226,10 @@ def _delete_media_row(row: Media, db: Session) -> None:
         try:
             cf = get_cloudflare_plugin(db)
             if cf:
-                key = row.local_path.split("/", 2)[-1]
+                # local_path format: r2://{bucket}/{key}  e.g. r2://moharaznx/media/file.jpg
+                # strip scheme and bucket → key = "media/file.jpg"
+                without_scheme = row.local_path[5:]  # "moharaznx/media/file.jpg"
+                key = without_scheme.split("/", 1)[1] if "/" in without_scheme else without_scheme
                 delete_from_r2(cf, key)
         except Exception:
             pass
