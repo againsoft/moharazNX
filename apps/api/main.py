@@ -51,8 +51,7 @@ settings = get_settings()
 require_admin = [Depends(get_current_user)]
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
+def _bootstrap() -> None:
     db = SessionLocal()
     try:
         import scripts.init_db  # noqa: F401 — register all models
@@ -73,6 +72,12 @@ async def lifespan(_app: FastAPI):
         pass
     finally:
         db.close()
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    import threading
+    threading.Thread(target=_bootstrap, daemon=True).start()
     yield
 
 
