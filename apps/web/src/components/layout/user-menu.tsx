@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, Settings, User, UserCircle } from "lucide-react";
 import { BranchSwitcher, CompanySwitcher } from "@/components/layout/scope-switchers";
 import { ThemeSwitch } from "@/components/theme/theme-switch";
 import { companies } from "@/lib/navigation";
 import { useAppStore } from "@/lib/store/app-store";
+import { useAdminAuth } from "@/lib/store/admin-auth-store";
+import { logoutAdmin } from "@/lib/api/auth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,8 +20,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function UserMenu() {
+  const router = useRouter();
   const companyId = useAppStore((s) => s.companyId);
   const company = companies.find((c) => c.id === companyId);
+  const { user, clearSession } = useAdminAuth();
+
+  const handleSignOut = async () => {
+    try { await logoutAdmin(); } catch { /* ignore */ }
+    clearSession();
+    router.replace("/login");
+  };
 
   return (
     <DropdownMenu>
@@ -38,7 +49,7 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-52">
         <DropdownMenuLabel>
           <div className="flex flex-col gap-0.5">
-            <span>Admin User</span>
+            <span>{user?.name ?? "Admin User"}</span>
             <span className="text-[11px] font-normal text-muted-foreground">{company?.name}</span>
           </div>
         </DropdownMenuLabel>
@@ -66,7 +77,7 @@ export function UserMenu() {
           Profile
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem onClick={() => void handleSignOut()} className="cursor-pointer text-destructive focus:text-destructive">
           <LogOut className="mr-2 h-4 w-4" aria-hidden />
           Sign out
         </DropdownMenuItem>
