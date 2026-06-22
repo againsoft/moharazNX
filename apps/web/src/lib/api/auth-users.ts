@@ -12,15 +12,19 @@ export type ApiUserResponse = {
 
 export type ApiUserCreate = {
   email: string;
+  username: string;
   name: string;
   role: string;
   password: string;
 };
 
 export type ApiUserUpdate = {
+  email?: string;
+  username?: string;
   name?: string;
   role?: string;
   is_active?: boolean;
+  password?: string;
 };
 
 export async function fetchAuthUsers(): Promise<AdminUser[]> {

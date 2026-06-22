@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AdminUser } from "@/lib/store/admin-auth-store";
-import type { ApiUserCreate } from "@/lib/api/auth-users";
+import type { ApiUserCreate, ApiUserUpdate } from "@/lib/api/auth-users";
 import { createAuthUser, deleteAuthUser, fetchAuthUsers, updateAuthUser } from "@/lib/api/auth-users";
 
 export function useAuthUsers() {
@@ -38,7 +38,7 @@ export function useAuthUsers() {
     return created;
   }, []);
 
-  const patchUser = useCallback(async (userId: string, patch: { role?: string; name?: string; is_active?: boolean }) => {
+  const patchUser = useCallback(async (userId: string, patch: ApiUserUpdate) => {
     const updated = await updateAuthUser(userId, patch);
     setUsers((prev) => prev.map((u) => (u.id === userId ? updated : u)));
     return updated;
