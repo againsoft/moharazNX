@@ -1,10 +1,11 @@
 "use client";
 
-import { FileText, Video } from "lucide-react";
+import { FileText, Trash2, Video } from "lucide-react";
 import type { MediaLibraryItem } from "@/lib/mock-data/media-library";
 import type { MediaUsageRef } from "@/lib/media/media-usage";
 import { getDocumentKindLabel } from "@/lib/media/safe-upload-types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -13,6 +14,7 @@ type Props = {
   usageCount?: number;
   usageRefs?: MediaUsageRef[];
   onUpdate?: (patch: Partial<Pick<MediaLibraryItem, "name" | "title" | "alt">>) => void;
+  onDelete?: (id: string) => void;
 };
 
 function formatDate(iso: string) {
@@ -74,7 +76,7 @@ function MediaDetailPreview({ item }: { item: MediaLibraryItem }) {
   );
 }
 
-export function MediaLibraryDetailPanel({ item, usageCount = 0, usageRefs = [], onUpdate }: Props) {
+export function MediaLibraryDetailPanel({ item, usageCount = 0, usageRefs = [], onUpdate, onDelete }: Props) {
   const readOnly = !onUpdate;
   if (!item) {
     return (
@@ -207,6 +209,18 @@ export function MediaLibraryDetailPanel({ item, usageCount = 0, usageRefs = [], 
               ))}
             </ul>
           </div>
+        )}
+
+        {onDelete && (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="w-full"
+            onClick={() => onDelete(item.id)}
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Delete file
+          </Button>
         )}
 
         {item.localPath && (

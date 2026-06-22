@@ -1,5 +1,7 @@
-# MoharazNX local infrastructure — AgainERP TECHNOLOGY_CONSTITUTION (PostgreSQL + Redis later)
-# Usage: docker compose up -d
+# MoharazNX — local full stack (PostgreSQL + API + Web)
+# Usage: docker compose up --build
+# UI: http://localhost:3000 · API: http://127.0.0.1:8000 · DB: localhost:5433
+# Production: Railway (API+DB) + Vercel (UI) — git push auto-deploys Railway
 
 services:
   postgres:
@@ -11,7 +13,6 @@ services:
       POSTGRES_PASSWORD: moharaznx
       POSTGRES_DB: moharaznx
     ports:
-      # Host 5433 → avoids conflict with local PostgreSQL on 5432 (macOS)
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -21,5 +22,45 @@ services:
       timeout: 5s
       retries: 10
 
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: moharaznx-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://moharaznx:moharaznx@postgres:5432/moharaznx
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      APP_ENV: development
+      APP_DEBUG: "true"
+    volumes:
+      - ./apps/api:/app
+      - api_uploads:/app/uploads
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: moharaznx-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+    volumes:
+      - ./apps/web:/app
+      - web_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run dev -- --hostname 0.0.0.0 --port 3000"
+    depends_on:
+      - api
+
 volumes:
   pgdata:
+  api_uploads:
+  web_node_modules:

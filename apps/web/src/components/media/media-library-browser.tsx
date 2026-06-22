@@ -38,6 +38,7 @@ type Props = {
   focusedId: string | null;
   onItemClick: (item: MediaLibraryItem) => void;
   onItemUpdate: (id: string, patch: Partial<Pick<MediaLibraryItem, "name" | "title" | "alt">>) => void;
+  onDelete?: (ids: string[]) => void;
   mode?: MediaLibraryMode;
   onUpload?: (files: FileList) => void;
   onImport?: (items: MediaLibraryItem[]) => void;
@@ -66,6 +67,7 @@ export function MediaLibraryBrowser({
   mode = "multiple",
   onUpload,
   onImport,
+  onDelete,
   accept,
   compact,
 }: Props) {
@@ -295,6 +297,7 @@ export function MediaLibraryBrowser({
                 if (!focusedItem) return;
                 onItemUpdate(focusedItem.id, patch);
               } : undefined}
+              onDelete={canWrite && onDelete ? (id) => onDelete([id]) : undefined}
             />
           </div>
         </aside>

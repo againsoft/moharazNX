@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Cloud, HardDrive, Upload, RefreshCw } from "lucide-react";
+import { Cloud, HardDrive, Upload, RefreshCw, Trash2 } from "lucide-react";
 import {
   filterMediaLibraryItems,
   type MediaLibraryItem,
@@ -13,6 +13,8 @@ import { useMediaStore } from "@/lib/store/media-store";
 import {
   useCatalogMedia,
   createCatalogMediaBatch,
+  deleteCatalogMediaItem,
+  deleteCatalogMediaBulk,
   patchCatalogMediaItem,
   uploadCatalogMediaFiles,
 } from "@/lib/api/use-catalog-media";
@@ -109,6 +111,27 @@ export default function MediaPage() {
     }
   };
 
+  const handleDelete = async (ids: string[]) => {
+    if (!ids.length) return;
+    const confirmed = window.confirm(
+      `Delete ${ids.length} file${ids.length === 1 ? "" : "s"}? This will also remove them from Cloudflare R2.`,
+    );
+    if (!confirmed) return;
+    try {
+      if (ids.length === 1) {
+        await deleteCatalogMediaItem(ids[0]);
+      } else {
+        await deleteCatalogMediaBulk(ids);
+      }
+      toast.success(`Deleted ${ids.length} file${ids.length === 1 ? "" : "s"}`);
+      setSelectedIds([]);
+      setFocusedId(null);
+      void refetch({ query });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    }
+  };
+
   const handleItemUpdate = async (
     id: string,
     patch: Partial<Pick<MediaLibraryItem, "name" | "title" | "alt">>,
@@ -163,6 +186,16 @@ export default function MediaPage() {
           )}
         </div>
         <div className="flex gap-2">
+          {canWrite && selectedIds.length > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => void handleDelete(selectedIds)}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Delete ({selectedIds.length})
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -194,6 +227,7 @@ export default function MediaPage() {
           focusedId={focusedId}
           onItemClick={handleItemClick}
           onItemUpdate={handleItemUpdate}
+          onDelete={(ids) => void handleDelete(ids)}
           mode="multiple"
           onUpload={(files) => void handleUpload(files)}
           onImport={(imported) => void handleImport(imported)}

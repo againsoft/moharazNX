@@ -100,3 +100,10 @@ export async function uploadCatalogMediaFiles(files: File[]): Promise<MediaLibra
 export async function deleteCatalogMediaItem(id: string): Promise<void> {
   await apiFetch(`/api/v1/media/${id}`, { method: "DELETE" });
 }
+
+export async function deleteCatalogMediaBulk(ids: string[]): Promise<void> {
+  await apiFetch(`/api/v1/media/bulk`, {
+    method: "DELETE",
+    body: JSON.stringify(ids),
+  });
+}

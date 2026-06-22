@@ -150,6 +150,19 @@ def upload_to_r2(row: CloudflarePlugin, key: str, content: bytes, mime: str) -> 
     )
 
 
+def delete_from_r2(row: CloudflarePlugin, key: str) -> None:
+    import boto3
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=f"https://{row.account_id.strip()}.r2.cloudflarestorage.com",
+        aws_access_key_id=row.r2_access_key_id.strip(),
+        aws_secret_access_key=row.r2_secret_access_key.strip(),
+        region_name="auto",
+    )
+    s3.delete_object(Bucket=row.r2_bucket.strip(), Key=key)
+
+
 def public_r2_url(row: CloudflarePlugin, key: str) -> str:
     base = row.r2_public_base_url.strip().rstrip("/")
     if base:

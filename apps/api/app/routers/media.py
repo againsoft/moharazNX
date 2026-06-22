@@ -8,7 +8,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.services.media_storage import save_media_bytes
+from app.services.media_storage import save_media_bytes, get_cloudflare_plugin
+from app.services.cloudflare_client import delete_from_r2
 from app.deps.auth import require_write_access
 from app.database import get_db
 from app.models.media import Media
@@ -220,6 +221,31 @@ def update_media(
     return MediaResponse(data=_to_read(row))
 
 
+def _delete_media_row(row: Media, db: Session) -> None:
+    if row.provider == "r2" and row.local_path and row.local_path.startswith("r2://"):
+        try:
+            cf = get_cloudflare_plugin(db)
+            if cf:
+                key = row.local_path.split("/", 2)[-1]
+                delete_from_r2(cf, key)
+        except Exception:
+            pass
+    db.delete(row)
+
+
+@router.delete("/bulk", status_code=204)
+def delete_media_bulk(
+    ids: List[str],
+    db: Session = Depends(get_db),
+    _: object = Depends(require_write_access),
+) -> None:
+    for media_id in ids:
+        row = db.get(Media, media_id)
+        if row:
+            _delete_media_row(row, db)
+    db.commit()
+
+
 @router.delete("/{media_id}", status_code=204)
 def delete_media(
     media_id: str,
@@ -229,5 +255,5 @@ def delete_media(
     row = db.get(Media, media_id)
     if not row:
         raise HTTPException(status_code=404, detail="Media not found")
-    db.delete(row)
+    _delete_media_row(row, db)
     db.commit()

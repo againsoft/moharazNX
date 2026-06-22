@@ -11,15 +11,31 @@ Ecommerce platform built on **AgainERP** architecture — admin + storefront, do
 | `apps/api/` | FastAPI backend + PostgreSQL (Phase 2) |
 | [AgainERP](../againerp/) | Parent ecosystem — full ecommerce specs |
 
-## Local development
+## Local development (Docker — one command)
+
+```bash
+cd /Applications/XAMPP/xamppfiles/htdocs/moharaznx
+docker compose up --build
+```
+
+| Service | URL |
+|---------|-----|
+| Admin UI | http://localhost:3000 |
+| API | http://127.0.0.1:8000 |
+| API docs | http://127.0.0.1:8000/docs |
+| PostgreSQL | `localhost:5433` |
+
+Login: `admin@moharaznx.com` / `admin123` (seeded on first API start)
+
+Stop: `docker compose down`
+
+## Local development (manual)
 
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
-
-Open http://localhost:3000 → admin dashboard.
 
 ### API (FastAPI + PostgreSQL)
 
@@ -51,6 +67,15 @@ Next.js · TypeScript · Tailwind · Shadcn UI · AG Grid · Recharts · CMDK ·
 
 Same as [AgainERP Technology Constitution](../againerp/docs/00-foundation/TECHNOLOGY_CONSTITUTION.md).
 
-## Deploy (Vercel)
+## Deploy
+
+| Environment | UI | API + DB |
+|-------------|-----|----------|
+| **Local** | `docker compose up` → :3000 | same stack → :8000 + Docker Postgres |
+| **Production** | Vercel (`apps/web`) | Railway (`apps/api` + PostgreSQL) |
+
+`git push origin main` → Railway auto-redeploys API.
+
+### Vercel
 
 Set **Root Directory** to `apps/web`.

@@ -6,6 +6,8 @@
 
 | **Fixed** | Remove Railway `preDeployCommand` — private DB host unavailable during pre-deploy; seed runs on app startup instead |
 
+| **Added** | Docker full stack — `docker compose up` runs Postgres + API + Web locally |
+
 ## 2026-06-22 — Cloudflare Connect with OAuth
 
 | Change | Detail |
