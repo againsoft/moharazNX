@@ -34,5 +34,5 @@ export function readLegacyAppStorePreference(): string | null {
   }
 }
 
-/** Inline script for layout `<head>` — prevents theme flash before hydration. */
-export const THEME_INIT_SCRIPT = `(function(){try{var p=localStorage.getItem('againerp-theme');var pref='system';if(p){var s=JSON.parse(p);if(s&&s.state&&s.state.preference)pref=s.state.preference;}else{var l=localStorage.getItem('againerp-prototype');if(l){var a=JSON.parse(l);if(a&&a.state&&a.state.theme)pref=a.state.theme;}}var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var m=pref==='dark'||(pref==='system'&&d)?'dark':'light';var r=document.documentElement;r.classList.toggle('dark',m==='dark');r.setAttribute('data-theme',m);r.style.colorScheme=m;}catch(e){}})();`;
+/** Inline script for layout `<head>` — always light mode, dark mode fully disabled. */
+export const THEME_INIT_SCRIPT = `(function(){var r=document.documentElement;r.classList.remove('dark');r.setAttribute('data-theme','light');r.style.colorScheme='light';})();`;

@@ -183,7 +183,7 @@ export function LiveSearch({
       ? "h-11 pl-10 text-sm"
       : variant === "mobile"
         ? "h-10 pl-9"
-        : "h-8 pl-9 text-xs";
+        : "h-[44px] rounded-full border-0 bg-[#f4f5f7] pl-10 text-sm shadow-none outline-none ring-0 placeholder:text-gray-400 focus-visible:ring-0";
 
   const showPanel = open && (flatItems.length > 0 || hasQuery);
 

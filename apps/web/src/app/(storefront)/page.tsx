@@ -3,6 +3,9 @@ import { SectionHeader } from "@/components/storefront/home/section-header";
 import { CategoryGrid } from "@/components/storefront/home/category-grid";
 import { ProductRail } from "@/components/storefront/home/product-rail";
 import { HomeDealsSection } from "@/components/storefront/home/home-deals-section";
+import { PromoBanners } from "@/components/storefront/home/promo-banners";
+import { ProductSpotlight } from "@/components/storefront/home/product-spotlight";
+import { PcBuilderCta } from "@/components/storefront/home/pc-builder-cta";
 import { BrandsStrip } from "@/components/storefront/home/brands-strip";
 import { ReviewsSection } from "@/components/storefront/home/reviews-section";
 import { BlogSection } from "@/components/storefront/home/blog-section";
@@ -12,11 +15,9 @@ import { TrustFeatures } from "@/components/storefront/trust-features";
 import { storefrontPaths } from "@/lib/url-slug/storefront-paths";
 import {
   aiPicks,
-  bestSellers,
   blogPosts,
   customerReviews,
   featuredCategories,
-  featuredProducts,
   heroSlides,
   newArrivals,
   storefrontBrands,
@@ -25,63 +26,67 @@ import {
 export default function StorefrontHomePage() {
   return (
     <div className="space-y-8 sm:space-y-10">
+      {/* Hero slider — full-width, flush with header, no top gap */}
       <HeroBanner slides={heroSlides} />
 
+      {/* Trust badges */}
       <TrustFeatures />
 
-      <section>
+      {/* Category quick-access — 12 tiles */}
+      <section aria-label="Shop by category">
         <SectionHeader
-          title="Shop by category"
-          subtitle="Laptops, phones, components & accessories — from AgainERP catalog"
+          title="Shop by Category"
+          subtitle="Laptops, phones, components & accessories"
           href={storefrontPaths.categories}
         />
         <CategoryGrid categories={featuredCategories} />
       </section>
 
+      {/* Product spotlight — 2-col with center fire icon */}
+      <ProductSpotlight />
+
+      {/* 2-col promo banners */}
+      <PromoBanners />
+
+      {/* Tabbed best sellers / most wanted */}
       <HomeDealsSection />
 
-      <section>
+      {/* New arrivals rail */}
+      <section aria-label="New arrivals">
         <SectionHeader
-          title="Featured products"
-          subtitle="Hand-picked from our catalog"
-          href={storefrontPaths.products}
-        />
-        <ProductRail products={featuredProducts} columns={6} />
-      </section>
-
-      <section>
-        <SectionHeader
-          title="Best sellers"
-          subtitle="Top-rated by shoppers across Bangladesh"
-          href={storefrontPaths.bestsellers}
-        />
-        <ProductRail products={bestSellers} columns={6} />
-      </section>
-
-      <section>
-        <SectionHeader
-          title="New arrivals"
+          title="New Arrivals"
           subtitle="Latest laptops, phones & PC parts"
           href={storefrontPaths.newArrivals}
         />
         <ProductRail products={newArrivals} columns={6} />
       </section>
 
-      <section>
-        <SectionHeader title="Shop by brand" href={storefrontPaths.categories} />
+      {/* PC Builder CTA banner */}
+      <PcBuilderCta />
+
+      {/* Brands we distribute */}
+      <section aria-label="Brands we distribute">
+        <SectionHeader
+          title="Brands We Distribute"
+          subtitle="Official distributor of trusted brands"
+          href={storefrontPaths.categories}
+        />
         <BrandsStrip brands={storefrontBrands} />
       </section>
 
+      {/* AI picks */}
       <AiRecommendations products={aiPicks} />
 
-      <section>
-        <SectionHeader title="Customer reviews" subtitle="Verified buyers across MoharazNX" />
+      {/* Customer reviews */}
+      <section aria-label="Customer reviews">
+        <SectionHeader title="Customer Reviews" subtitle="Verified buyers across MoharazNX" />
         <ReviewsSection reviews={customerReviews} />
       </section>
 
-      <section>
+      {/* Blog */}
+      <section aria-label="From the blog">
         <SectionHeader
-          title="From the blog"
+          title="From the Blog"
           subtitle="Buying guides, PC builds & tech tips"
           href={storefrontPaths.blog}
         />
