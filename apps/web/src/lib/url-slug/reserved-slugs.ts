@@ -35,6 +35,16 @@ export const RESERVED_SLUGS = new Set([
   "privacy",
   "terms",
   "sitemap",
+  "center",
+  "customers",
+  "suppliers",
+  "reports",
+  "configurator",
+  "notifications",
+  "ai-os",
+  "system",
+  "website",
+  "seo",
 ]);
 
 export function isReservedSlug(slug: string) {

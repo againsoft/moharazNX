@@ -32,6 +32,15 @@ export async function fetchAuthUsers(): Promise<AdminUser[]> {
   return res.data;
 }
 
+export async function fetchMentionableUsers(): Promise<
+  Pick<AdminUser, "id" | "name" | "username" | "role">[]
+> {
+  const res = await apiFetch<{ data: Pick<AdminUser, "id" | "name" | "username" | "role">[] }>(
+    "/api/v1/auth/users/mentionable",
+  );
+  return res.data;
+}
+
 export async function fetchAuthUser(userId: string): Promise<AdminUser> {
   const res = await apiFetch<ApiUserResponse>(`/api/v1/auth/users/${userId}`);
   return res.data;

@@ -368,6 +368,7 @@ export const PLATFORM_SETTINGS_CATEGORIES: SettingCategoryDef[] = [
     { key: "platform.license.domain_bind", label: "Domain Binding", type: "toggle", defaultValue: true },
   ]}]}]},
   { id: "feature-manager", title: "Feature Manager", description: "Module enable/disable, plan features", sections: [{ id: "main", title: "Features", groups: [{ id: "g", title: "Modules", items: [
+    { key: "platform.features.inventory", label: "Inventory Module", type: "toggle", defaultValue: true },
     { key: "platform.features.marketplace", label: "Marketplace Module", type: "toggle", defaultValue: false },
   ]}]}]},
   { id: "ai-center", title: "AI Center", description: "AI providers, budget, usage, prompts", sections: [{ id: "main", title: "AI", groups: [{ id: "g", title: "Providers", items: [

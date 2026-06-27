@@ -5,18 +5,23 @@ import type { Product } from "@/lib/mock-data/products";
 import { apiFetch } from "@/lib/api/client";
 import {
   apiProductToProduct,
+  checkCatalogProductSlug,
   fetchCatalogProductDetail,
+  fetchProductInventory,
+  fetchProductSpecs,
   productToApiPayload,
   productToApiUpdatePayload,
   replaceProductMedia,
   replaceProductSpecs,
   replaceProductVariants,
-  fetchProductSpecs,
+  upsertProductInventory,
   type ProductSpecs,
   type ApiProductDetailResponse,
   type ApiProductListResponse,
   type CreateCatalogProductInput,
   type ProductDetail,
+  type ProductInventoryInput,
+  type ProductInventoryRecord,
   type UpdateCatalogProductInput,
   type VariantUpsertInput,
 } from "@/lib/api/catalog-products";
@@ -66,8 +71,8 @@ export async function fetchCatalogProduct(id: string): Promise<Product> {
   return detail;
 }
 
-export { fetchCatalogProductDetail, fetchProductSpecs, replaceProductMedia, replaceProductSpecs, replaceProductVariants };
-export type { ProductDetail, ProductSpecs, VariantUpsertInput };
+export { fetchCatalogProductDetail, fetchProductSpecs, replaceProductMedia, replaceProductSpecs, replaceProductVariants, checkCatalogProductSlug, fetchProductInventory, upsertProductInventory };
+export type { ProductDetail, ProductSpecs, VariantUpsertInput, ProductInventoryInput, ProductInventoryRecord };
 
 export async function createCatalogProduct(input: CreateCatalogProductInput): Promise<ProductDetail> {
   const res = await apiFetch<ApiProductDetailResponse>("/api/v1/catalog/products", {

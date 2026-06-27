@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 import { useIsDark } from "@/lib/use-is-dark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,

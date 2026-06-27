@@ -1,8 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AgGridReact } from "ag-grid-react";
-import type { ColDef, ICellRendererParams, RowDragEndEvent } from "ag-grid-community";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Archive,
@@ -17,6 +32,7 @@ import {
   MoreHorizontal,
   MousePointerClick,
   Pencil,
+  Plus,
   SlidersHorizontal,
   Trash2,
   X,
@@ -27,13 +43,13 @@ import {
   deleteAttributeProfiles,
   patchAttributeProfile,
   reorderAttributeProfiles,
+  saveAttributeProfileBulk,
 } from "@/lib/api/use-catalog-attribute-profiles";
 import { cn } from "@/lib/utils";
-import { useIsDark } from "@/lib/use-is-dark";
 import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +59,8 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { ActivityTriggerButton } from "@/components/activity/activity-trigger-button";
 import { AttributeProfileFormDialog } from "@/components/attributes/attribute-profile-form-dialog";
+import { GroupFormDialog } from "@/components/attributes/group-form-dialog";
+import { AttributeSpecFormDialog } from "@/components/attributes/attribute-spec-form-dialog";
 
 const PAGE_SIZE = 25;
 
@@ -166,9 +184,7 @@ export function AttributeProfileGrid({
   onView,
   onEdit: onEditProp,
 }: Props) {
-  const isDark = useIsDark();
   const canWrite = useAdminCanWrite();
-  const gridRef = useRef<AgGridReact<AttributeProfile>>(null);
 
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [formOpen, setFormOpen] = useState(false);
@@ -186,6 +202,13 @@ export function AttributeProfileGrid({
   const [deleteTargets, setDeleteTargets] = useState<AttributeProfile[]>([]);
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [addGroupProfileId, setAddGroupProfileId] = useState<string | null>(null);
+  const [addAttrGroupId, setAddAttrGroupId] = useState<string | null>(null);
+  // local sort-order overrides (optimistic drag)
+  const [profileOrder, setProfileOrder] = useState<string[]>([]);
+  const [groupOrderMap, setGroupOrderMap] = useState<Record<string, string[]>>({});
+  const [attrOrderMap, setAttrOrderMap] = useState<Record<string, string[]>>({});
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const toggleProfile = (id: string) =>
     setExpandedProfiles((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -271,208 +294,106 @@ export function AttributeProfileGrid({
     void data;
   };
 
-  const onRowDragEnd = useCallback(
-    async (e: RowDragEndEvent<AttributeProfile>) => {
-      const dragged = e.node.data;
-      const over = e.overNode?.data;
-      if (!dragged || !over) return;
-
-      const orderedIds = reorderProfileIds(profiles, dragged.id, over.id);
-      if (!orderedIds) {
-        e.api.setGridOption("rowData", filtered);
-        return;
-      }
-
+  // ── DND handlers ──────────────────────────────────────────────────────────
+  const handleProfileDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const activeId = String(active.id);
+      const overId = String(over.id);
+      const orderedIds = reorderProfileIds(profiles, activeId, overId);
+      if (!orderedIds) return;
+      // optimistic
+      setProfileOrder(orderedIds);
       try {
         await reorderAttributeProfiles(orderedIds);
-        toast.success("Order updated");
         onProfilesChanged?.();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Reorder failed");
-        e.api.setGridOption("rowData", filtered);
+        setProfileOrder([]);
       }
     },
-    [profiles, filtered, onProfilesChanged],
+    [profiles, onProfilesChanged],
   );
 
-  const StatusCell = useCallback(
-    ({ data }: ICellRendererParams<AttributeProfile>) => {
-      if (!data) return null;
-      const on = data.active;
-      if (!liveEdit.status) {
-        return (
-          <span className={cn("text-[10px]", on ? "text-emerald-600" : "text-muted-foreground")}>
-            {on ? "On" : "Off"}
-          </span>
-        );
-      }
-      return (
-        <button
-          type="button"
-          className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
-            on
-              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-              : "bg-muted text-muted-foreground hover:bg-muted/80",
-          )}
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleActive(data);
-          }}
-        >
-          {on ? "On" : "Off"}
-        </button>
-      );
-    },
-    [liveEdit.status, toggleActive],
+  const makeGroupDragEnd = useCallback(
+    (profile: AttributeProfile, profileGroups: AttributeGroup[]) =>
+      async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const activeId = String(active.id);
+        const overId = String(over.id);
+        const ids = profileGroups.map((g) => g.id);
+        const from = ids.indexOf(activeId);
+        const to = ids.indexOf(overId);
+        if (from < 0 || to < 0) return;
+        const newIds = arrayMove(ids, from, to);
+        setGroupOrderMap((m) => ({ ...m, [profile.id]: newIds }));
+        try {
+          const reorderedGroups = newIds.map((gid) => profileGroups.find((g) => g.id === gid)!);
+          await saveAttributeProfileBulk({
+            profileId: profile.id,
+            profileName: profile.name,
+            groups: reorderedGroups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              attributes: attributes
+                .filter((a) => a.groupId === g.id)
+                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .map((a) => ({ id: a.id, name: a.name, filterable: a.isFilterable, predefinedValues: a.predefinedValues })),
+            })),
+          });
+          onProfilesChanged?.();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Reorder failed");
+          setGroupOrderMap((m) => { const n = { ...m }; delete n[profile.id]; return n; });
+        }
+      },
+    [attributes, onProfilesChanged],
   );
 
-  const RowActions = useCallback(
-    ({ data }: ICellRendererParams<AttributeProfile>) => {
-      if (!data) return null;
-      return (
-        <div className="flex items-center gap-0">
-          <ActivityTriggerButton
-            entity={{
-              type: "attribute_profile",
-              id: data.id,
-              label: data.name,
-              subtitle: `/${data.code}`,
-            }}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {onView && (
-                <DropdownMenuItem onClick={() => onView(data)}>
-                  <Eye className="mr-2 h-3.5 w-3.5" /> View
-                </DropdownMenuItem>
-              )}
-              {canWrite && (
-                <>
-                  <DropdownMenuItem onClick={() => openEdit(data)}>
-                    <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <a href={`/catalog/attributes/${data.id}`}>
-                      <ExternalLink className="mr-2 h-3.5 w-3.5" /> Edit Groups &amp; Attributes
-                    </a>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => turnOff(data)} className="text-destructive">
-                    <Archive className="mr-2 h-3.5 w-3.5" /> Turn off
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      );
-    },
-    [openEdit, turnOff, onView, canWrite],
+  const makeAttrDragEnd = useCallback(
+    (profile: AttributeProfile, group: AttributeGroup, groupAttrs: AttributeSpec[]) =>
+      async (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const activeId = String(active.id);
+        const overId = String(over.id);
+        const ids = groupAttrs.map((a) => a.id);
+        const from = ids.indexOf(activeId);
+        const to = ids.indexOf(overId);
+        if (from < 0 || to < 0) return;
+        const newIds = arrayMove(ids, from, to);
+        setAttrOrderMap((m) => ({ ...m, [group.id]: newIds }));
+        try {
+          const profileGroups = groups.filter((g) => g.profileId === profile.id).sort((a, b) => a.sortOrder - b.sortOrder);
+          await saveAttributeProfileBulk({
+            profileId: profile.id,
+            profileName: profile.name,
+            groups: profileGroups.map((g) => ({
+              id: g.id,
+              name: g.name,
+              attributes: (g.id === group.id
+                ? newIds.map((id) => groupAttrs.find((a) => a.id === id)!)
+                : attributes.filter((a) => a.groupId === g.id).sort((a, b) => a.sortOrder - b.sortOrder)
+              ).map((a) => ({ id: a.id, name: a.name, filterable: a.isFilterable, predefinedValues: a.predefinedValues })),
+            })),
+          });
+          onProfilesChanged?.();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Reorder failed");
+          setAttrOrderMap((m) => { const n = { ...m }; delete n[group.id]; return n; });
+        }
+      },
+    [groups, attributes, onProfilesChanged],
   );
 
-  const columnDefs = useMemo<ColDef<AttributeProfile>[]>(
-    () => [
-      {
-        headerCheckboxSelection: canWrite,
-        checkboxSelection: canWrite,
-        width: 32,
-        maxWidth: 32,
-        pinned: "left",
-        resizable: false,
-        suppressMovable: true,
-        suppressHeaderMenuButton: true,
-      },
-      {
-        rowDrag: true,
-        width: 32,
-        maxWidth: 32,
-        pinned: "left",
-        resizable: false,
-        suppressMovable: true,
-        suppressHeaderMenuButton: true,
-        headerComponent: () => (
-          <GripVertical className="mx-auto h-3.5 w-3.5 text-muted-foreground" />
-        ),
-      },
-      {
-        field: "name",
-        headerName: "Name",
-        width: 240,
-        minWidth: 140,
-        editable: false,
-        tooltipField: "name",
-        cellRenderer: (p: ICellRendererParams<AttributeProfile>) => {
-          if (!p.data) return null;
-          return (
-            <button
-              type="button"
-              className="block w-full truncate text-left font-semibold text-foreground hover:underline focus-visible:outline-none"
-              onClick={(e) => {
-                e.stopPropagation();
-                openEdit(p.data!);
-              }}
-            >
-              {p.data.name}
-            </button>
-          );
-        },
-      },
-      {
-        field: "code",
-        headerName: "Code",
-        width: 140,
-        hide: !visibleCols.code,
-      },
-      {
-        colId: "categories",
-        headerName: "Categories",
-        width: 180,
-        hide: !visibleCols.categories,
-        valueGetter: (p) => p.data?.categoryLabels.join(", ") || "—",
-      },
-      {
-        field: "productCount",
-        headerName: "Products",
-        width: 88,
-        hide: !visibleCols.products,
-      },
-      {
-        colId: "status",
-        field: "active",
-        headerName: "Status",
-        width: 88,
-        hide: !visibleCols.status,
-        cellRenderer: StatusCell,
-      },
-      {
-        field: "updatedAt",
-        headerName: "Updated",
-        width: 100,
-        hide: !visibleCols.updated,
-      },
-      {
-        colId: "actions",
-        headerName: "Action",
-        width: 72,
-        maxWidth: 72,
-        pinned: "right",
-        resizable: false,
-        suppressMovable: true,
-        cellRenderer: RowActions,
-        sortable: false,
-        suppressHeaderMenuButton: true,
-      },
-    ],
-    [RowActions, visibleCols, liveEdit, StatusCell, onView, openEdit],
-  );
-
-  const pageStart = page * PAGE_SIZE + 1;
-  const pageEnd = Math.min((page + 1) * PAGE_SIZE, filtered.length);
+  // effective ordering helpers
+  const effectiveProfileIds = useMemo(() => {
+    const ordered2 = [...profiles].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (profileOrder.length) return profileOrder;
+    return ordered2.map((p) => p.id);
+  }, [profiles, profileOrder]);
 
   const toggleVisibleFilter = (key: FilterKey, enabled: boolean) => {
     setVisibleFilters((v) => ({ ...v, [key]: enabled }));
@@ -602,7 +523,7 @@ export function AttributeProfileGrid({
       )}
 
       {/* Tree list */}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-input bg-card">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-input bg-card">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16">
             <p className="text-sm font-medium">No profiles match your filters</p>
@@ -611,197 +532,168 @@ export function AttributeProfileGrid({
             </Button>
           </div>
         ) : (
-          <div className="divide-y divide-input">
-            {filtered.map((profile) => {
-              const profileExpanded = expandedProfiles.has(profile.id);
-              const profileGroups = groups
-                .filter((g) => g.profileId === profile.id)
-                .sort((a, b) => a.sortOrder - b.sortOrder);
-              return (
-                <div key={profile.id} className={cn(!profile.active && "opacity-50")}>
-                  {/* Profile row */}
-                  <div className="flex items-center gap-1.5 px-3 py-2 hover:bg-muted/30">
-                    <input
-                      type="checkbox"
-                      checked={selected.some((s) => s.id === profile.id)}
-                      onChange={(e) =>
-                        setSelected((prev) =>
-                          e.target.checked ? [...prev, profile] : prev.filter((s) => s.id !== profile.id)
-                        )
-                      }
-                      className="shrink-0 rounded border-input"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => toggleProfile(profile.id)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      {profileExpanded
-                        ? <ChevronDown className="h-3.5 w-3.5" />
-                        : <ChevronRight className="h-3.5 w-3.5" />}
-                    </button>
-                    <Layers className="h-3.5 w-3.5 shrink-0 text-primary" />
-                    <button
-                      type="button"
-                      className="min-w-0 flex-1 truncate text-left text-sm font-semibold hover:underline focus-visible:outline-none"
-                      onClick={() => openEdit(profile)}
-                    >
-                      {profile.name}
-                    </button>
-                    <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:block">
-                      {profile.code}
-                    </span>
-                    <span className="hidden shrink-0 text-[11px] text-muted-foreground lg:block">
-                      {profile.categoryLabels.join(", ") || "—"}
-                    </span>
-                    <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:block">
-                      {profile.productCount} products
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleActive(profile); }}
-                      className={cn(
-                        "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
-                        profile.active
-                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {profile.active ? "On" : "Off"}
-                    </button>
-                    <div className="flex shrink-0 items-center gap-0">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {onView && (
-                            <DropdownMenuItem onClick={() => onView(profile)}>
-                              <Eye className="mr-2 h-3.5 w-3.5" /> View
-                            </DropdownMenuItem>
-                          )}
-                          {canWrite && (
-                            <>
-                              <DropdownMenuItem onClick={() => openEdit(profile)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => turnOff(profile)} className="text-destructive">
-                                <Archive className="mr-2 h-3.5 w-3.5" /> Turn off
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openDeleteConfirm([profile])} className="text-destructive">
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleProfileDragEnd}>
+            <SortableContext items={effectiveProfileIds} strategy={verticalListSortingStrategy}>
+              <div className="divide-y divide-input">
+                {effectiveProfileIds
+                  .map((pid) => filtered.find((p) => p.id === pid))
+                  .filter(Boolean)
+                  .map((profile) => {
+                    const p = profile!;
+                    const profileExpanded = expandedProfiles.has(p.id);
+                    const rawGroups = groups
+                      .filter((g) => g.profileId === p.id)
+                      .sort((a, b) => a.sortOrder - b.sortOrder);
+                    const orderedGroupIds = groupOrderMap[p.id] ?? rawGroups.map((g) => g.id);
+                    const profileGroups = orderedGroupIds
+                      .map((id) => rawGroups.find((g) => g.id === id))
+                      .filter(Boolean) as AttributeGroup[];
 
-                  {/* Groups tree — shown when profile expanded */}
-                  {profileExpanded && (
-                    <div className="ml-[30px] border-l border-input pl-3 pb-1">
-                      {profileGroups.length === 0 ? (
-                        <p className="py-1.5 text-[11px] text-muted-foreground">No groups yet</p>
-                      ) : (
-                        profileGroups.map((group) => {
-                          const groupExpanded = expandedGroups.has(group.id);
-                          const groupAttrs = attributes
-                            .filter((a) => a.groupId === group.id)
-                            .sort((a, b) => a.sortOrder - b.sortOrder);
-                          return (
-                            <div key={group.id}>
-                              {/* Group row */}
-                              <button
-                                type="button"
-                                onClick={() => toggleGroup(group.id)}
-                                className="flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-muted/40"
-                              >
-                                {groupExpanded
-                                  ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                                  : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                                <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
-                                <span className="flex-1 text-xs font-medium">{group.name}</span>
-                                <span className="text-[10px] text-muted-foreground">{groupAttrs.length}</span>
-                              </button>
+                    return (
+                      <SortableProfileRow
+                        key={p.id}
+                        profile={p}
+                        profileExpanded={profileExpanded}
+                        onToggleProfile={() => toggleProfile(p.id)}
+                        onEdit={() => openEdit(p)}
+                        onToggleActive={() => toggleActive(p)}
+                        onTurnOff={() => turnOff(p)}
+                        onDelete={() => openDeleteConfirm([p])}
+                        onView={onView ? () => onView!(p) : undefined}
+                        selected={selected.some((s) => s.id === p.id)}
+                        onSelect={(checked) =>
+                          setSelected((prev) => checked ? [...prev, p] : prev.filter((s) => s.id !== p.id))
+                        }
+                        canWrite={canWrite}
+                      >
+                        {profileExpanded && (
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={makeGroupDragEnd(p, profileGroups)}
+                          >
+                            <SortableContext items={orderedGroupIds} strategy={verticalListSortingStrategy}>
+                              <div className="ml-8 border-l border-input pb-1 pl-3">
+                                {profileGroups.map((group) => {
+                                  const groupExpanded = expandedGroups.has(group.id);
+                                  const rawAttrs = attributes
+                                    .filter((a) => a.groupId === group.id)
+                                    .sort((a, b) => a.sortOrder - b.sortOrder);
+                                  const orderedAttrIds = attrOrderMap[group.id] ?? rawAttrs.map((a) => a.id);
+                                  const groupAttrs = orderedAttrIds
+                                    .map((id) => rawAttrs.find((a) => a.id === id))
+                                    .filter(Boolean) as AttributeSpec[];
 
-                              {/* Attributes — shown when group expanded */}
-                              {groupExpanded && (
-                                <div className="ml-5 border-l border-input pl-3 py-0.5">
-                                  {groupAttrs.map((attr) => (
-                                    <div key={attr.id}>
-                                      <div className="flex flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px] hover:bg-muted/30">
-                                        <span className="font-medium">{attr.name}</span>
-                                        {attr.isFilterable && (
-                                          <span className="inline-flex items-center gap-0.5 rounded bg-sky-100 px-1 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
-                                            <Filter className="h-2.5 w-2.5" />
-                                            Filter
-                                          </span>
-                                        )}
-                                      </div>
-                                      {attr.isFilterable && (attr.predefinedValues ?? []).length > 0 && (
-                                        <div className="ml-3 border-l border-input pl-2.5 pb-0.5">
-                                          <div className="flex flex-wrap gap-1 pt-0.5">
-                                            {(attr.predefinedValues ?? []).map((v) => (
-                                              <span key={v} className="rounded border border-input bg-muted/50 px-1 py-0.5 text-[10px] text-muted-foreground">{v}</span>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                                  return (
+                                    <SortableGroupRow
+                                      key={group.id}
+                                      group={group}
+                                      groupExpanded={groupExpanded}
+                                      onToggle={() => toggleGroup(group.id)}
+                                      groupAttrs={groupAttrs}
+                                      orderedAttrIds={orderedAttrIds}
+                                      onDragEndAttrs={makeAttrDragEnd(p, group, groupAttrs)}
+                                      sensors={sensors}
+                                      onAddAttribute={canWrite ? () => setAddAttrGroupId(group.id) : undefined}
+                                    />
+                                  );
+                                })}
+                                {canWrite && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setAddGroupProfileId(p.id)}
+                                    className="mt-1 flex w-full items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                                  >
+                                    <Plus className="h-3 w-3" /> Add group
+                                  </button>
+                                )}
+                              </div>
+                            </SortableContext>
+                          </DndContext>
+                        )}
+                      </SortableProfileRow>
+                    );
+                  })}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
-      {/* Mobile fallback */}
-      <div className="md:hidden">
-        <div className="space-y-2">
-          {filtered.slice(0, 50).map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center gap-3 rounded-lg border border-input bg-card px-3 py-2.5"
-            >
-              <div className="min-w-0 flex-1">
-                <button
-                  type="button"
-                  className="block w-full truncate text-left text-sm font-semibold hover:underline"
-                  onClick={() => openEdit(p)}
-                >
-                  {p.name}
-                </button>
-                <p className="truncate text-xs text-muted-foreground">{p.code}</p>
-              </div>
-              <span
-                className={cn(
-                  "shrink-0 text-[10px] font-medium",
-                  p.active ? "text-emerald-600" : "text-muted-foreground",
-                )}
-              >
-                {p.active ? "Active" : "Inactive"}
-              </span>
-            </div>
-          ))}
-          {filtered.length > 50 && (
-            <p className="text-center text-xs text-muted-foreground">
-              Showing 50 of {filtered.length} — use desktop to reorder
-            </p>
-          )}
-        </div>
-      </div>
+      {/* Group dialog */}
+      <GroupFormDialog
+        open={addGroupProfileId !== null}
+        onOpenChange={(open) => { if (!open) setAddGroupProfileId(null); }}
+        profileId={addGroupProfileId ?? ""}
+        onSave={async (data) => {
+          const prof = profiles.find((p) => p.id === data.profileId);
+          if (!prof) return;
+          const profileGroups = groups
+            .filter((g) => g.profileId === data.profileId)
+            .sort((a, b) => a.sortOrder - b.sortOrder);
+          try {
+            await saveAttributeProfileBulk({
+              profileId: data.profileId,
+              profileName: prof.name,
+              groups: [
+                ...profileGroups.map((g) => ({
+                  id: g.id,
+                  name: g.name,
+                  attributes: attributes
+                    .filter((a) => a.groupId === g.id)
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((a) => ({ id: a.id, name: a.name, filterable: a.isFilterable, predefinedValues: a.predefinedValues })),
+                })),
+                { name: data.name ?? "", attributes: [] },
+              ],
+            });
+            toast.success("Group created");
+            onProfilesChanged?.();
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed");
+          }
+        }}
+      />
+
+      {/* Attribute dialog */}
+      {addAttrGroupId && (() => {
+        const group = groups.find((g) => g.id === addAttrGroupId);
+        const prof = group ? profiles.find((p) => p.id === group.profileId) : null;
+        return (
+          <AttributeSpecFormDialog
+            open
+            onOpenChange={(open) => { if (!open) setAddAttrGroupId(null); }}
+            groupId={addAttrGroupId}
+            onSave={async (data) => {
+              if (!group || !prof) return;
+              const profileGroups = groups
+                .filter((g) => g.profileId === group.profileId)
+                .sort((a, b) => a.sortOrder - b.sortOrder);
+              try {
+                await saveAttributeProfileBulk({
+                  profileId: prof.id,
+                  profileName: prof.name,
+                  groups: profileGroups.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    attributes: [
+                      ...attributes
+                        .filter((a) => a.groupId === g.id)
+                        .sort((a, b) => a.sortOrder - b.sortOrder)
+                        .map((a) => ({ id: a.id, name: a.name, filterable: a.isFilterable, predefinedValues: a.predefinedValues })),
+                      ...(g.id === addAttrGroupId ? [{ name: data.name ?? "", filterable: data.isFilterable ?? false }] : []),
+                    ],
+                  })),
+                });
+                toast.success("Attribute created");
+                onProfilesChanged?.();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Failed");
+              }
+            }}
+          />
+        );
+      })()}
 
       {/* Internal form dialog (fallback when onEdit prop not provided) */}
       <AttributeProfileFormDialog
@@ -964,6 +856,229 @@ export function AttributeProfileGrid({
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+    </div>
+  );
+}
+
+/* ── Sortable profile row ─────────────────────────────────────────────────── */
+function SortableProfileRow({
+  profile, profileExpanded, onToggleProfile, onEdit, onToggleActive, onTurnOff, onDelete, onView,
+  selected, onSelect, canWrite, children,
+}: {
+  profile: AttributeProfile;
+  profileExpanded: boolean;
+  onToggleProfile: () => void;
+  onEdit: () => void;
+  onToggleActive: () => void;
+  onTurnOff: () => void;
+  onDelete: () => void;
+  onView?: () => void;
+  selected: boolean;
+  onSelect: (checked: boolean) => void;
+  canWrite: boolean;
+  children?: React.ReactNode;
+}) {
+  const { attributes: dndAttrs, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: profile.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className={cn(!profile.active && "opacity-60")}
+    >
+      <div className="flex items-center gap-1.5 px-3 py-2 hover:bg-muted/30">
+        {canWrite && (
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            className="shrink-0 rounded border-input"
+          />
+        )}
+        <button
+          type="button"
+          className="shrink-0 cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          {...dndAttrs}
+          {...listeners}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggleProfile}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          {profileExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+        <Layers className="h-3.5 w-3.5 shrink-0 text-primary" />
+        <button
+          type="button"
+          className="min-w-0 flex-1 truncate text-left text-sm font-semibold hover:underline focus-visible:outline-none"
+          onClick={onEdit}
+        >
+          {profile.name}
+        </button>
+        <span className="hidden shrink-0 font-mono text-[11px] text-muted-foreground sm:block">{profile.code}</span>
+        <span className="hidden shrink-0 text-[11px] text-muted-foreground lg:block">
+          {profile.categoryLabels.join(", ") || "—"}
+        </span>
+        <span className="hidden shrink-0 text-[11px] text-muted-foreground sm:block">
+          {profile.productCount} products
+        </span>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleActive(); }}
+          className={cn(
+            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors",
+            profile.active ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground",
+          )}
+        >
+          {profile.active ? "On" : "Off"}
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onView && (
+              <DropdownMenuItem onClick={onView}>
+                <Eye className="mr-2 h-3.5 w-3.5" /> View
+              </DropdownMenuItem>
+            )}
+            {canWrite && (
+              <>
+                <DropdownMenuItem onClick={onEdit}>
+                  <Pencil className="mr-2 h-3.5 w-3.5" /> Edit profile
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`/catalog/attributes/${profile.id}`}>
+                    <ExternalLink className="mr-2 h-3.5 w-3.5" /> Full editor
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onTurnOff} className="text-destructive">
+                  <Archive className="mr-2 h-3.5 w-3.5" /> Turn off
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/* ── Sortable group row ───────────────────────────────────────────────────── */
+function SortableGroupRow({
+  group, groupExpanded, onToggle, groupAttrs, orderedAttrIds,
+  onDragEndAttrs, sensors, onAddAttribute,
+}: {
+  group: AttributeGroup;
+  groupExpanded: boolean;
+  onToggle: () => void;
+  groupAttrs: AttributeSpec[];
+  orderedAttrIds: string[];
+  onDragEndAttrs: (event: DragEndEvent) => void;
+  sensors: ReturnType<typeof useSensors>;
+  onAddAttribute?: () => void;
+}) {
+  const { attributes: dndAttrs, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: group.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+    >
+      <div className="flex items-center gap-1.5 rounded-md px-1 py-1 hover:bg-muted/40">
+        <button
+          type="button"
+          className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+          {...dndAttrs}
+          {...listeners}
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-1.5 text-left"
+        >
+          {groupExpanded
+            ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-sky-600 dark:text-sky-400" />
+          <span className="flex-1 text-xs font-medium">{group.name}</span>
+          <span className="mr-1 text-[10px] text-muted-foreground">{groupAttrs.length}</span>
+        </button>
+        {onAddAttribute && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onAddAttribute(); }}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Add attribute"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {groupExpanded && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEndAttrs}>
+          <SortableContext items={orderedAttrIds} strategy={verticalListSortingStrategy}>
+            <div className="ml-5 border-l border-input pl-3 py-0.5">
+              {groupAttrs.map((attr) => (
+                <SortableAttrRow key={attr.id} attr={attr} />
+              ))}
+              {groupAttrs.length === 0 && onAddAttribute && (
+                <button
+                  type="button"
+                  onClick={onAddAttribute}
+                  className="flex w-full items-center gap-1.5 py-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3 w-3" /> Add first attribute
+                </button>
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+    </div>
+  );
+}
+
+/* ── Sortable attribute row ───────────────────────────────────────────────── */
+function SortableAttrRow({ attr }: { attr: AttributeSpec }) {
+  const { attributes: dndAttrs, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: attr.id });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
+      className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[11px] hover:bg-muted/30"
+    >
+      <button
+        type="button"
+        className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+        {...dndAttrs}
+        {...listeners}
+      >
+        <GripVertical className="h-3 w-3" />
+      </button>
+      <span className="font-medium">{attr.name}</span>
+      {attr.isFilterable && (
+        <span className="inline-flex items-center gap-0.5 rounded bg-sky-100 px-1 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+          <Filter className="h-2.5 w-2.5" /> Filter
+        </span>
+      )}
+      <span className="ml-auto text-muted-foreground">{attr.fieldType}</span>
     </div>
   );
 }

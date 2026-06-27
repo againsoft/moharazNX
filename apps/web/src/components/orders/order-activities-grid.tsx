@@ -12,7 +12,7 @@ import {
 import { useOrderModulesStore } from "@/lib/store/order-modules-store";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { OrderSubGridShell } from "@/components/orders/order-sub-grid-shell";
 

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import type { AdminUser } from "@/lib/store/admin-auth-store";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 const ROLES = ["admin", "staff", "viewer"] as const;

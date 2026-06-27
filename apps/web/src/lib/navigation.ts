@@ -10,6 +10,7 @@ import {
   Package,
   Search,
   Settings,
+  Shield,
   ShoppingCart,
   Sparkles,
   Truck,
@@ -28,6 +29,12 @@ export type NavItem = {
 /** MoharazNX — Ecommerce-only navigation (AgainERP ecommerce module). */
 export const sidebarNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  {
+    title: "Control Center",
+    href: "/center",
+    icon: Shield,
+    section: "PLATFORM",
+  },
 
   {
     title: "Catalog",

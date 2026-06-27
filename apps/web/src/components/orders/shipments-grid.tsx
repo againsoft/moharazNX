@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { SHIPMENT_STATUS_LABELS, type OrderShipment, type ShipmentStatus } from "@/lib/mock-data/order-modules";
 import { useOrderModulesStore } from "@/lib/store/order-modules-store";
 import { formatCurrency } from "@/lib/utils";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { ActivityTriggerButton } from "@/components/activity/activity-trigger-button";
 import { OrderSubGridShell } from "@/components/orders/order-sub-grid-shell";

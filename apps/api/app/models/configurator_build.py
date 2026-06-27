@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -30,8 +31,8 @@ class ConfiguratorBuild(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     build_code: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
-    customer_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    user_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    user_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     components_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     total_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     compatibility_status: Mapped[str] = mapped_column(String(32), nullable=False, default="compatible")

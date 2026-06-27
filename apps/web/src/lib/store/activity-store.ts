@@ -22,6 +22,7 @@ import {
   filterByEntity,
   getSeedActivitiesForEntity,
 } from "@/lib/mock-data/activities";
+import { useNotificationStore } from "@/lib/store/notification-store";
 
 type ActivityStore = {
   entries: ActivityEntry[];
@@ -39,7 +40,16 @@ type ActivityStore = {
   closeDrawer: () => void;
 
   getBundle: (type: ActivityEntityRef["type"], id: string) => EntityActivityBundle;
-  addComment: (type: ActivityEntityRef["type"], id: string, body: string, author?: string) => void;
+  addComment: (
+    type: ActivityEntityRef["type"],
+    id: string,
+    body: string,
+    author?: string,
+    authorId?: string,
+    parentId?: string,
+    mentions?: string[],
+    entityLabel?: string,
+  ) => void;
   addNote: (type: ActivityEntityRef["type"], id: string, body: string, author?: string) => void;
   toggleFollow: (type: ActivityEntityRef["type"], id: string, user: { userId: string; name: string; initials: string }) => void;
   logActivity: (entry: Omit<ActivityEntry, "id">) => void;
@@ -89,21 +99,39 @@ export const useActivityStore = create<ActivityStore>()(
         };
       },
 
-      addComment: (type, id, body, author = CURRENT_USER.name) =>
-        set((s) => ({
-          comments: [
-            {
-              id: `cmt_${Date.now()}`,
+      addComment: (type, id, body, author = CURRENT_USER.name, authorId, parentId, mentions = [], entityLabel = id) =>
+        set((s) => {
+          const commentId = `cmt_${Date.now()}`;
+          const nextComment: ActivityComment = {
+            id: commentId,
+            entityType: type,
+            entityId: id,
+            author,
+            authorId,
+            parentId,
+            authorInitials: author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase(),
+            body,
+            mentions,
+            at: new Date().toISOString(),
+          };
+
+          if (mentions.length > 0 && authorId) {
+            useNotificationStore.getState().notifyMentions({
+              mentionedUserIds: mentions,
+              actorUserId: authorId,
+              actorName: author,
               entityType: type,
               entityId: id,
-              author,
-              authorInitials: author.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase(),
-              body,
-              at: new Date().toISOString(),
-            },
-            ...s.comments,
-          ],
-        })),
+              entityLabel,
+              commentId,
+              commentPreview: body,
+            });
+          }
+
+          return {
+            comments: [nextComment, ...s.comments],
+          };
+        }),
 
       addNote: (type, id, body, author = CURRENT_USER.name) =>
         set((s) => ({

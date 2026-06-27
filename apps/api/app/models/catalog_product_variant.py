@@ -33,6 +33,7 @@ class CatalogProductVariant(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
     is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    image_id: Mapped[Optional[str]] = mapped_column(String(36), ForeignKey("media.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

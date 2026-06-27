@@ -6,7 +6,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import {
   FIELD_TYPE_LABELS,
   type AttributeFieldType,

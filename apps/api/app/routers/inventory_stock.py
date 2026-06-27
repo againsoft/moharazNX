@@ -68,6 +68,7 @@ def list_stock(
     search: Optional[str] = Query(default=None),
     warehouse_id: Optional[str] = Query(default=None),
     warehouse: Optional[str] = Query(default=None),
+    product_id: Optional[str] = Query(default=None),
     status: Optional[str] = Query(default=None),
 ) -> StockListResponse:
     query = (
@@ -80,6 +81,8 @@ def list_stock(
         query = query.filter(InventoryStockLevel.warehouse_id == warehouse_id)
     if warehouse:
         query = query.filter(InventoryWarehouse.name == warehouse)
+    if product_id:
+        query = query.filter(InventoryStockLevel.product_id == product_id)
     if status:
         query = query.filter(InventoryStockLevel.status == status)
     if search:

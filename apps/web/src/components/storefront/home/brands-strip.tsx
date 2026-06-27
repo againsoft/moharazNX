@@ -9,19 +9,19 @@ type BrandsStripProps = {
 
 export function BrandsStrip({ brands }: BrandsStripProps) {
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
       {brands.map((brand) => (
         <Link
           key={brand.id}
           href={brandPath(brand.slug)}
-          className="flex h-16 items-center justify-center rounded-xl border border-border/60 bg-card px-4 transition hover:border-primary/30 hover:shadow-sm"
+          className="group flex h-16 items-center justify-center rounded-xl border border-border/60 bg-card px-4 transition-all hover:border-[#dc2626]/40 hover:shadow-md"
         >
           <Image
             src={brand.logo}
             alt={brand.name}
             width={100}
             height={32}
-            className="h-6 w-auto object-contain opacity-70 grayscale transition hover:opacity-100 hover:grayscale-0"
+            className="h-6 w-auto object-contain opacity-50 grayscale transition-all duration-300 group-hover:opacity-100 group-hover:grayscale-0"
           />
         </Link>
       ))}

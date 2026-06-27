@@ -3,6 +3,9 @@
 @import "ag-grid-community/styles/ag-grid.css";
 @import "ag-grid-community/styles/ag-theme-quartz.css";
 
+/* Dark Tailwind utilities only inside admin panel — storefront ignores html.dark */
+@custom-variant dark (&:where(.admin-site.dark, .admin-site.dark *));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -43,6 +46,12 @@ body {
   color: var(--foreground);
   font-size: 0.875rem;
   line-height: 1.4;
+}
+
+html.storefront-site body,
+body.storefront-site {
+  background: #ffffff !important;
+  color: #0f172a !important;
 }
 
 /* Shared control border — matches catalog/products live search */
@@ -335,15 +344,47 @@ body {
   }
 }
 
-/* Storefront — MoharazNX customer shop theme */
+/* Storefront — MoharazNX customer shop theme (light only, white page) */
+html.storefront-site,
+html.storefront-site.dark,
+html.storefront-site[data-theme="dark"] {
+  color-scheme: light !important;
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --popover: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #f1f5f9;
+  --accent-foreground: #0f172a;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --color-background: #ffffff;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+}
+
+body.storefront-site {
+  background: #ffffff;
+  color: #0f172a;
+}
+
 .storefront {
+  --background: #ffffff;
+  --color-background: #ffffff;
   --radius: 0.375rem;
   --sf-max: 90rem;
   --primary: #eb6626;
   --primary-foreground: #ffffff;
   --ring: color-mix(in srgb, #eb6626 35%, var(--border));
+  background-color: #ffffff;
   font-size: inherit;
   line-height: inherit;
+  color-scheme: light;
 }
 
 .storefront h1 {

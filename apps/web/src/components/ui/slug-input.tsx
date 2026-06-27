@@ -10,7 +10,12 @@ type SlugInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChan
   onChange: (value: string) => void;
   excludeId?: string;
   urlPrefix?: React.ReactNode;
+  suffix?: React.ReactNode;
   showMessage?: boolean;
+  /** When set, also checks slug availability against the catalog products API. */
+  apiTaken?: boolean;
+  apiMessage?: string | null;
+  apiChecking?: boolean;
 };
 
 export function SlugInput({
@@ -18,27 +23,42 @@ export function SlugInput({
   onChange,
   excludeId,
   urlPrefix,
+  suffix,
   showMessage = true,
+  apiTaken = false,
+  apiMessage,
+  apiChecking = false,
   className,
   ...props
 }: SlugInputProps) {
   const validation = validateSlug(value, excludeId ? { id: excludeId } : undefined);
-  const invalid = !!value.trim() && !validation.isValid;
+  const invalid = (!!value.trim() && !validation.isValid) || apiTaken;
+
+  const message =
+    apiTaken && apiMessage
+      ? apiMessage
+      : validation.message;
 
   return (
     <div className="min-w-0">
       <div className={cn("flex items-center gap-1 text-sm", urlPrefix && "gap-1")}>
         {urlPrefix}
-        <Input
-          {...props}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={cn("min-w-0 flex-1", invalid && SLUG_INPUT_INVALID_CLASS, className)}
-          aria-invalid={invalid}
-        />
+        <div className="relative min-w-0 flex-1">
+          <Input
+            {...props}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className={cn("min-w-0 w-full", invalid && SLUG_INPUT_INVALID_CLASS, className)}
+            aria-invalid={invalid}
+          />
+          {suffix}
+        </div>
       </div>
-      {showMessage && invalid && validation.message && (
-        <p className="mt-1 text-[10px] text-destructive">{validation.message}</p>
+      {showMessage && apiChecking && (
+        <p className="mt-1 text-[10px] text-muted-foreground">Checking slug availability…</p>
+      )}
+      {showMessage && !apiChecking && invalid && message && (
+        <p className="mt-1 text-[10px] text-destructive">{message}</p>
       )}
     </div>
   );

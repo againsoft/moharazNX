@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { DealsHero } from "@/components/storefront/deals/deals-hero";
 import { DealSpotlight } from "@/components/storefront/deals/deal-spotlight";
 import { DealProductCard } from "@/components/storefront/deals/deal-product-card";

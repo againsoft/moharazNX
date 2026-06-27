@@ -28,7 +28,7 @@ export function WorkspaceShell({ children }: Props) {
       <ViewerReadOnlyBanner />
 
       <div className="flex min-h-0 flex-1">
-        <div className="hidden lg:flex">
+        <div className="hidden md:flex">
           <WorkspaceSidebar />
         </div>
 

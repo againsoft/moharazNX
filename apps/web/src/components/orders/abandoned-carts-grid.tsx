@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { RECOVERY_STATUS_LABELS, type AbandonedCart, type RecoveryStatus } from "@/lib/mock-data/order-modules";
 import { useOrderModulesStore } from "@/lib/store/order-modules-store";
 import { cn, formatCurrency } from "@/lib/utils";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { OrderSubGridShell } from "@/components/orders/order-sub-grid-shell";

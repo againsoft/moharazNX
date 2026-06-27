@@ -4,7 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
+  useLayoutEffect,
   useMemo,
   useSyncExternalStore,
 } from "react";
@@ -33,10 +33,7 @@ type Props = {
   children: React.ReactNode;
 };
 
-/**
- * ThemeProvider — applies design tokens via `data-theme` + `.dark` on `<html>`.
- * Persists preference in `againerp-theme` localStorage.
- */
+/** Admin-only theme — mount via AdminThemeShell, not on storefront routes. */
 export function ThemeProvider({ children }: Props) {
   const preference = useThemeStore((s) => s.preference);
   const setPreferenceStore = useThemeStore((s) => s.setPreference);
@@ -51,7 +48,9 @@ export function ThemeProvider({ children }: Props) {
   const resolvedMode = resolveThemeMode(preference, systemPrefersDark);
   const isDark = isDarkMode(preference, systemPrefersDark);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    document.documentElement.classList.remove("storefront-site");
+    document.body?.classList.remove("storefront-site");
     applyThemeToDocument(resolvedMode);
   }, [resolvedMode]);
 

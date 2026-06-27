@@ -7,10 +7,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps.auth import require_admin_user
+from app.deps.auth import get_current_user, require_admin_user
 from app.models.auth_activity_log import AuthActivityLog
 from app.models.auth_user import AuthUser
-from app.schemas.auth import UserCreate, UserListMeta, UserListResponse, UserRead, UserResponse, UserUpdate
+from app.schemas.auth import (
+    MentionableUserListResponse,
+    MentionableUserRead,
+    UserCreate,
+    UserListMeta,
+    UserListResponse,
+    UserRead,
+    UserResponse,
+    UserUpdate,
+)
 from app.security import hash_password
 
 router = APIRouter(prefix="/users", tags=["auth-users"])
@@ -117,6 +126,30 @@ def delete_user(
     db.commit()
     db.delete(row)
     db.commit()
+
+
+@router.get("/mentionable", response_model=MentionableUserListResponse)
+def list_mentionable_users(
+    _: AuthUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MentionableUserListResponse:
+    rows = (
+        db.query(AuthUser)
+        .filter(AuthUser.is_active.is_(True))
+        .order_by(AuthUser.name)
+        .all()
+    )
+    return MentionableUserListResponse(
+        data=[
+            MentionableUserRead(
+                id=row.id,
+                username=row.username,
+                name=row.name,
+                role=row.role,
+            )
+            for row in rows
+        ]
+    )
 
 
 @router.get("", response_model=UserListResponse)

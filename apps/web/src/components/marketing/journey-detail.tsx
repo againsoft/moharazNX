@@ -5,7 +5,7 @@ import { ArrowLeft, Workflow } from "lucide-react";
 import type { MarketingJourney } from "@/lib/mock-data/marketing";
 import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS: MarketingJourney["status"][] = ["active", "draft", "paused"];

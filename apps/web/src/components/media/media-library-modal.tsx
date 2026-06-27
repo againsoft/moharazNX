@@ -11,6 +11,7 @@ import {
 } from "@/lib/mock-data/media-library";
 import { filterByMediaUsage, useMediaUsageMap, type MediaUsageFilter } from "@/lib/media/media-usage";
 import { describeAcceptTypes, isTypeAllowedForPicker } from "@/lib/media/picker-accept";
+import { filterSafeUploadFiles } from "@/lib/media/safe-upload-types";
 import { useMediaStore } from "@/lib/store/media-store";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -32,6 +33,9 @@ type Props = {
   initialSelectedIds?: string[];
   /** When set, use these items instead of the local media store (API-backed). */
   items?: MediaLibraryItem[];
+  /** Persist uploads to API (e.g. product form with useCatalogMedia). */
+  onUploadFiles?: (files: File[]) => Promise<MediaLibraryItem[]>;
+  onImportItems?: (items: MediaLibraryItem[]) => Promise<MediaLibraryItem[]>;
 };
 
 export function MediaLibraryModal({
@@ -43,6 +47,8 @@ export function MediaLibraryModal({
   accept,
   initialSelectedIds = [],
   items: itemsProp,
+  onUploadFiles,
+  onImportItems,
 }: Props) {
   const storeItems = useMediaStore((state) => state.items);
   const items = itemsProp ?? storeItems;
@@ -55,7 +61,12 @@ export function MediaLibraryModal({
   const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [pinnedIds, setPinnedIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
 
+  // Reset state when dialog opens. We capture initialSelectedIds at open-time only,
+  // so we intentionally exclude it from the dependency array to avoid infinite loops
+  // when the caller passes a new array literal on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!open) return;
     setSelectedIds(initialSelectedIds);
@@ -64,7 +75,7 @@ export function MediaLibraryModal({
     setActiveTab("library");
     setFocusedId(initialSelectedIds[0] ?? null);
     setPinnedIds([]);
-  }, [open, initialSelectedIds]);
+  }, [open]);
 
   const usageMap = useMediaUsageMap();
 
@@ -155,17 +166,52 @@ export function MediaLibraryModal({
     }
   };
 
-  const handleUpload = (files: FileList) => {
-    const { items: uploaded, rejected } = createUploadedMediaItemsFromFiles(files);
+  const handleUpload = async (files: FileList) => {
+    const { allowed, rejected } = filterSafeUploadFiles(files);
     if (rejected.length) {
       toast.error(
         `${rejected.length} file${rejected.length === 1 ? "" : "s"} blocked — unsafe file type.`,
       );
     }
+    if (!allowed.length) return;
+
+    if (onUploadFiles) {
+      setUploading(true);
+      try {
+        const uploaded = await onUploadFiles(allowed);
+        applyImportedItems(uploaded);
+        toast.success(`Uploaded ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
+
+    const { items: uploaded, rejected: localRejected } = createUploadedMediaItemsFromFiles(files);
+    if (localRejected.length) {
+      toast.error(
+        `${localRejected.length} file${localRejected.length === 1 ? "" : "s"} blocked — unsafe file type.`,
+      );
+    }
     if (uploaded.length) applyImportedItems(uploaded);
   };
 
-  const handleImport = (imported: MediaLibraryItem[]) => {
+  const handleImport = async (imported: MediaLibraryItem[]) => {
+    if (onImportItems) {
+      setUploading(true);
+      try {
+        const saved = await onImportItems(imported);
+        applyImportedItems(saved);
+        toast.success(`Imported ${saved.length} item${saved.length === 1 ? "" : "s"}`);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Import failed");
+      } finally {
+        setUploading(false);
+      }
+      return;
+    }
     applyImportedItems(imported);
   };
 

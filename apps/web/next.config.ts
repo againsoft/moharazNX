@@ -26,6 +26,26 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  /** Proxy API through Next.js in local dev — avoids CORS / localhost vs 127.0.0.1 mismatches. */
+  async rewrites() {
+    const apiTarget = (
+      process.env.API_PROXY_TARGET ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      "http://127.0.0.1:8000"
+    ).replace(/\/$/, "");
+
+    return [
+      {
+        source: "/api/v1/:path*",
+        destination: `${apiTarget}/api/v1/:path*`,
+      },
+      {
+        source: "/health",
+        destination: `${apiTarget}/health`,
+      },
+    ];
+  },
+
   async redirects() {
     const systemRoutes = [
       "account",

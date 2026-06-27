@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import { Search } from "lucide-react";
 import { COMMAND_PALETTE_OPEN_EVENT } from "@/lib/navigation/command-palette";
@@ -23,11 +23,15 @@ function flattenNav() {
 const navItems = flattenNav();
 
 export function CommandPalette() {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const recentPages = useAppStore((s) => s.recentPages);
 
+  const isCenterRoute = pathname?.startsWith("/center") ?? false;
+
   useEffect(() => {
+    if (isCenterRoute) return;
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -41,9 +45,9 @@ export function CommandPalette() {
       document.removeEventListener("keydown", down);
       document.removeEventListener(COMMAND_PALETTE_OPEN_EVENT, openFromEvent);
     };
-  }, []);
+  }, [isCenterRoute]);
 
-  if (!open) return null;
+  if (isCenterRoute || !open) return null;
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/50" onClick={() => setOpen(false)}>

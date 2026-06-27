@@ -209,7 +209,7 @@ export function AdminSidebar() {
         )}
       </div>
 
-      <div className="hidden border-t p-1.5 lg:block">
+      <div className="hidden border-t p-1.5 md:block">
         <Button
           variant="ghost"
           size="sm"

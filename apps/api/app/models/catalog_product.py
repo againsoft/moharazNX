@@ -56,7 +56,9 @@ class CatalogProduct(Base):
     tags_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
     seo_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     seo_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    warranty: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     thumbnail: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    custom_specs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MobileCardActions } from "@/components/activity/mobile-card-actions";
 
 function StatusBadge({ status }: { status: Product["status"] }) {
   const variant =
@@ -62,24 +63,33 @@ export function ProductMobileCards({ products, onView, onEdit, onArchive }: Prop
               <StatusBadge status={p.status} />
             </div>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onView(p)}>
-                <Eye className="mr-2 h-3.5 w-3.5" /> View
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onEdit(p)}>
-                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onArchive(p)} className="text-destructive">
-                <Archive className="mr-2 h-3.5 w-3.5" /> Archive
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <MobileCardActions
+            entity={{
+              type: "product",
+              id: p.id,
+              label: p.name,
+              subtitle: `SKU ${p.sku}`,
+            }}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => onView(p)}>
+                  <Eye className="mr-2 h-3.5 w-3.5" /> View
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(p)}>
+                  <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onArchive(p)} className="text-destructive">
+                  <Archive className="mr-2 h-3.5 w-3.5" /> Archive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </MobileCardActions>
         </div>
       ))}
     </div>

@@ -60,34 +60,33 @@ export function ProductMediaGallery({
 
   return (
     <div className={cn(compact ? "space-y-2" : "space-y-3", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-medium text-muted-foreground">Product media</p>
-        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          {imageCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
-              <ImageIcon className="h-3 w-3" />
-              {imageCount}
-            </span>
-          )}
-          {videoCount > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5">
-              <Video className="h-3 w-3" />
-              {videoCount}
-            </span>
-          )}
-        </div>
-      </div>
-
       <div
         className={cn(
           "relative w-full overflow-hidden rounded-lg border bg-muted shadow-sm",
           square
-            ? "aspect-square"
+            ? "aspect-square max-h-64"
             : compact
               ? "aspect-[4/3] max-h-44"
               : "aspect-square rounded-xl",
         )}
       >
+        {/* image/video count badges — top-right corner */}
+        {(imageCount > 0 || videoCount > 0) && (
+          <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
+            {imageCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                <ImageIcon className="h-3 w-3" />
+                {imageCount}
+              </span>
+            )}
+            {videoCount > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2 py-0.5 text-[11px] text-white backdrop-blur-sm">
+                <Video className="h-3 w-3" />
+                {videoCount}
+              </span>
+            )}
+          </div>
+        )}
         {active.type === "video" ? (
           <video
             key={active.id}

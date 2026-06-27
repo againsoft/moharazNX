@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { Menu } from "lucide-react";
-import { Suspense, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { NotificationCenter } from "@/components/layout/notification-center";
+import { CenterPlatformLink } from "@/components/center/center-platform-link";
 import { ScopeSwitchers } from "@/components/layout/scope-switchers";
 import { UserMenu } from "@/components/layout/user-menu";
 import { ThemeSwitch } from "@/components/theme/theme-switch";
-import { TopBreadcrumb } from "@/components/navigation/top-breadcrumb";
 import { TopNavAiAssistant } from "@/components/navigation/top-nav-ai-assistant";
 import { TopNavGlobalSearch } from "@/components/navigation/top-nav-global-search";
 import { TopNavQuickCreate } from "@/components/navigation/top-nav-quick-create";
@@ -17,18 +17,16 @@ import { cn } from "@/lib/utils";
 type Props = {
   className?: string;
   onMobileMenuClick?: () => void;
+  onDesktopMenuClick?: () => void;
   showMobileMenuButton?: boolean;
-  /** Optional slot before breadcrumb (e.g. module context). */
+  /** Optional slot after brand (e.g. module context). */
   leading?: ReactNode;
 };
-
-function BreadcrumbFallback() {
-  return <div className="h-4 w-32 animate-pulse rounded bg-muted" aria-hidden />;
-}
 
 export function TopNavigation({
   className,
   onMobileMenuClick,
+  onDesktopMenuClick,
   showMobileMenuButton = true,
   leading,
 }: Props) {
@@ -47,9 +45,21 @@ export function TopNavigation({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 lg:hidden"
+              className="h-9 w-9 shrink-0 md:hidden"
               onClick={onMobileMenuClick}
               aria-label="Open navigation menu"
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </Button>
+          ) : null}
+          {onDesktopMenuClick ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="hidden h-9 w-9 shrink-0 md:flex"
+              onClick={onDesktopMenuClick}
+              aria-label="Toggle sidebar"
             >
               <Menu className="h-5 w-5" aria-hidden />
             </Button>
@@ -63,10 +73,6 @@ export function TopNavigation({
           </Link>
 
           {leading}
-
-          <Suspense fallback={<BreadcrumbFallback />}>
-            <TopBreadcrumb className="hidden min-w-0 flex-1 md:flex" />
-          </Suspense>
         </div>
 
         <div className="hidden min-w-0 flex-1 justify-center px-2 md:flex">
@@ -74,6 +80,7 @@ export function TopNavigation({
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+          <CenterPlatformLink className="hidden sm:inline-flex" />
           <TopNavGlobalSearch compact className="md:hidden" />
           <ScopeSwitchers />
           <TopNavQuickCreate />
@@ -83,12 +90,6 @@ export function TopNavigation({
           <UserMenu />
         </div>
       </div>
-
-      <Suspense fallback={null}>
-        <div className="border-t px-2 py-1.5 md:hidden">
-          <TopBreadcrumb compact expandable />
-        </div>
-      </Suspense>
     </header>
   );
 }

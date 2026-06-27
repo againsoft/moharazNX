@@ -284,7 +284,7 @@ export function WorkspaceSidebar({ className, onNavigate }: Props) {
         })}
       </div>
 
-      <div className="hidden border-t p-2 lg:block" data-component="WS-SIDE-COLLAPSE">
+      <div className="hidden border-t p-2 md:block" data-component="WS-SIDE-COLLAPSE">
         <Button
           type="button"
           variant="ghost"

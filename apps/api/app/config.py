@@ -21,7 +21,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_reload: bool = True
 
-    cors_origins: str = "http://localhost:3000"
+    cors_origins: str = (
+        "http://localhost:3000,http://127.0.0.1:3000,"
+        "http://localhost:3002,http://127.0.0.1:3002,"
+        "http://localhost:3003,http://127.0.0.1:3003"
+    )
 
     cloudflare_oauth_client_id: str = ""
     cloudflare_oauth_client_secret: str = ""

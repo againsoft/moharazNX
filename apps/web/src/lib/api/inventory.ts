@@ -1,4 +1,5 @@
 import type { StockItem, StockStatus, Warehouse } from "@/lib/mock-data/inventory";
+import { apiFetch } from "@/lib/api/client";
 
 export type ApiWarehouse = {
   id: string;
@@ -63,6 +64,7 @@ export type StockListParams = {
   search?: string;
   warehouse?: string;
   warehouse_id?: string;
+  product_id?: string;
   status?: string;
 };
 
@@ -104,6 +106,7 @@ export function buildStockQuery(params?: StockListParams): string {
   if (params.search) q.set("search", params.search);
   if (params.warehouse) q.set("warehouse", params.warehouse);
   if (params.warehouse_id) q.set("warehouse_id", params.warehouse_id);
+  if (params.product_id) q.set("product_id", params.product_id);
   if (params.status) q.set("status", params.status);
   const s = q.toString();
   return s ? `?${s}` : "";
@@ -127,4 +130,12 @@ export function stockUpdateToApiPayload(input: UpdateStockLevelInput) {
     max_qty: input.maxQty,
     unit_cost: input.unitCost,
   };
+}
+
+/** Load stock levels for a catalog product from the Inventory module API. */
+export async function fetchProductStockLevels(productId: string): Promise<ApiStockLevel[]> {
+  const res = await apiFetch<ApiStockListResponse>(
+    `/api/v1/inventory/stock${buildStockQuery({ product_id: productId })}`,
+  );
+  return res.data;
 }

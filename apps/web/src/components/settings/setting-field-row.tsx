@@ -3,7 +3,7 @@
 import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type { SettingItemDef } from "@/lib/settings/types";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 type Props = {

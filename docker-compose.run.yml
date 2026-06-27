@@ -1,4 +1,5 @@
-# Standalone run file — no host volume mounts (Docker Desktop file sharing not required)
+# Standalone run file — baked images, no host volume mounts (Docker Desktop file sharing not required)
+# Rebuild after web changes: docker compose -f docker-compose.run.yml build web && docker compose -f docker-compose.run.yml up -d --no-deps web
 # Usage: docker compose -f docker-compose.run.yml up -d
 
 services:
@@ -28,7 +29,7 @@ services:
       - "8000:8000"
     environment:
       DATABASE_URL: postgresql+psycopg://moharaznx:moharaznx@postgres:5432/moharaznx
-      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:3002,http://127.0.0.1:3002,http://localhost:3099,http://127.0.0.1:3099
       APP_ENV: development
       APP_DEBUG: "true"
     volumes:
@@ -39,13 +40,17 @@ services:
         condition: service_healthy
 
   web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
     image: moharaznx-web:latest
     container_name: moharaznx-web
     restart: unless-stopped
     ports:
       - "3002:3002"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8000
+      API_PROXY_TARGET: http://moharaznx-api:8000
     command: npm run dev -- --hostname 0.0.0.0 --port 3002
     depends_on:
       - api

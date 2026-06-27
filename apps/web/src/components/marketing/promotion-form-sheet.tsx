@@ -35,7 +35,7 @@ import { usePromotionStore } from "@/lib/store/promotion-store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { SlugInput } from "@/components/ui/slug-input";
 import { Switch } from "@/components/ui/switch";

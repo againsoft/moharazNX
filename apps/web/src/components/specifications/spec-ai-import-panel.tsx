@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { SpecificationsNav } from "@/components/specifications/specifications-nav";
 import { useAttributeProfileStore } from "@/lib/store/attribute-profile-store";

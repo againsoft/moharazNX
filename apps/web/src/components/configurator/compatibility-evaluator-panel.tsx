@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 
 const SAMPLE_BUILD = {
   cap_cpu: { socket: "lga_1700", tdp: 125, core_count: 8 },

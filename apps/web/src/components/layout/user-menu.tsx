@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, Settings, User, UserCircle } from "lucide-react";
+import { LogOut, Settings, Shield, User, UserCircle } from "lucide-react";
 import { BranchSwitcher, CompanySwitcher } from "@/components/layout/scope-switchers";
 import { ThemeSwitch } from "@/components/theme/theme-switch";
 import { companies } from "@/lib/navigation";
@@ -60,6 +60,12 @@ export function UserMenu() {
         <DropdownMenuSeparator className="lg:hidden" />
         <ThemeSwitch variant="menu" />
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/center" className="cursor-pointer text-violet-700 dark:text-violet-300">
+            <Shield className="mr-2 h-4 w-4" aria-hidden />
+            Control Center
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/settings" className="cursor-pointer">
             <Settings className="mr-2 h-4 w-4" aria-hidden />

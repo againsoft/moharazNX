@@ -6,7 +6,7 @@ import type { ConfiguratorAttributeField } from "@/lib/mock-data/configurator-at
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 
 type Props = {

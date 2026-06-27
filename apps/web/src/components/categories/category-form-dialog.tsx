@@ -5,11 +5,11 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { WordPressClassicEditor } from "@/components/products/wordpress-classic-editor";
+import { AgaincartClassicEditor } from "@/components/products/againcart-classic-editor";
 import { MediaField } from "@/components/media/media-field";
 import { SlugInput } from "@/components/ui/slug-input";
 import type { Category } from "@/lib/mock-data/categories";
@@ -205,7 +205,7 @@ export function CategoryFormDialog({
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Description
                 </h3>
-                <WordPressClassicEditor
+                <AgaincartClassicEditor
                   value={description}
                   onChange={setDescription}
                   placeholder="Category page description…"

@@ -3,7 +3,7 @@
 
 from decimal import Decimal
 from datetime import date, datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 from sqlalchemy import text
 
@@ -164,7 +164,7 @@ def seed_brands(db) -> int:
     return inserted
 
 
-def _parse_optional_date(value: Optional[str | date]) -> Optional[date]:
+def _parse_optional_date(value: Optional[Union[str, date]]) -> Optional[date]:
     if value is None:
         return None
     if isinstance(value, date):
@@ -1362,6 +1362,7 @@ def ensure_product_columns() -> None:
         "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS seo_title VARCHAR(255)",
         "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS seo_description TEXT",
         "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS attribute_profile_id VARCHAR(36)",
+        "ALTER TABLE catalog_products ADD COLUMN IF NOT EXISTS custom_specs_json TEXT",
     ]
     with engine.begin() as conn:
         for stmt in statements:

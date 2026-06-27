@@ -23,13 +23,20 @@ type UseInventoryWarehousesState = {
   refetch: () => Promise<void>;
 };
 
-export function useInventoryWarehouses(): UseInventoryWarehousesState {
+export function useInventoryWarehouses(enabled = true): UseInventoryWarehousesState {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
+    if (!enabled) {
+      setWarehouses([]);
+      setTotal(0);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -44,7 +51,7 @@ export function useInventoryWarehouses(): UseInventoryWarehousesState {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     void refetch();

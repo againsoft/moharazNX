@@ -10,17 +10,21 @@ import { Input } from "@/components/ui/input";
 
 export function AdminLoginForm() {
   const router = useRouter();
-  const hasHydrated = useAdminAuth((s) => s._hasHydrated);
   const { token, setSession } = useAdminAuth();
   const [email, setEmail] = useState("admin");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    if (!hasHydrated) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     if (token) router.replace("/dashboard");
-  }, [hasHydrated, token, router]);
+  }, [mounted, token, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,7 +42,9 @@ export function AdminLoginForm() {
       if (err instanceof ApiError) {
         setError(err.message);
       } else if (err instanceof TypeError) {
-        setError("Cannot reach API — check your connection or try again in a moment.");
+        setError(
+          "Cannot reach API — start Docker Desktop, then run: docker compose -f docker-compose.run.yml up -d"
+        );
       } else {
         setError("Login failed");
       }
@@ -81,7 +87,7 @@ export function AdminLoginForm() {
         {loading ? "Signing in…" : "Sign in"}
       </Button>
       <p className="text-xs text-muted-foreground text-center">
-        Demo: admin / admin123
+        Demo: admin / admin123 (password min. 6 characters)
       </p>
     </form>
   );

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { ProductCard } from "@/components/storefront/product-card";
 import { CatalogBreadcrumbs } from "@/components/storefront/catalog/catalog-breadcrumbs";
 import { CollectionHero } from "@/components/storefront/collections/collection-hero";

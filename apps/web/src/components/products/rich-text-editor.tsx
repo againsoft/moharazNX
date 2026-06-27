@@ -1,6 +1,6 @@
 "use client";
 
-import { WordPressClassicEditor } from "@/components/products/wordpress-classic-editor";
+import { AgaincartClassicEditor } from "@/components/products/againcart-classic-editor";
 import type { EditorAiContextId } from "@/lib/editor/editor-ai-prompts";
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   onChange: (value: string) => void;
   placeholder?: string;
   minRows?: number;
+  fieldLabel?: string;
   aiContext?: EditorAiContextId;
   aiVariables?: Record<string, string | undefined>;
 };
@@ -19,7 +20,7 @@ export function RichTextEditor({
   ...props
 }: Props) {
   return (
-    <WordPressClassicEditor
+    <AgaincartClassicEditor
       minRows={minRows}
       aiContext={aiContext}
       {...props}

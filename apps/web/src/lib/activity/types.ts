@@ -71,6 +71,7 @@ export type ActivityEntry = {
   description?: string;
   fieldChanges?: ActivityFieldChange[];
   actor: string;
+  actorId?: string;
   actorInitials: string;
   at: string;
 };
@@ -80,8 +81,10 @@ export type ActivityComment = {
   entityType: ActivityEntityType;
   entityId: string;
   author: string;
+  authorId?: string;
   authorInitials: string;
   body: string;
+  parentId?: string;
   mentions?: string[];
   at: string;
 };

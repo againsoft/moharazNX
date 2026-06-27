@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { WordPressClassicEditor } from "@/components/products/wordpress-classic-editor";
+import { AgaincartClassicEditor } from "@/components/products/againcart-classic-editor";
 import { MediaField } from "@/components/media/media-field";
 import { SlugInput } from "@/components/ui/slug-input";
 import type { Brand } from "@/lib/mock-data/brands";
@@ -155,7 +155,7 @@ export function BrandFormDialog({
                 <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Description
                 </h3>
-                <WordPressClassicEditor
+                <AgaincartClassicEditor
                   value={description}
                   onChange={setDescription}
                   placeholder="Brand page description…"

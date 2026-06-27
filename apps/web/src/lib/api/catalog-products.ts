@@ -1,7 +1,18 @@
 import type { Product, ProductStatus, ProductVisibility, StockStatusLabel } from "@/lib/mock-data/products";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, ApiError } from "@/lib/api/client";
 
 /** Raw product shape from FastAPI `/api/v1/catalog/products`. */
+export type DigitalFile = {
+  id: string;
+  product_id: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  download_limit: number | null;
+  expires_days: number | null;
+  sort_order: number;
+};
+
 export type ApiCatalogProduct = {
   id: string;
   company_id: string;
@@ -14,7 +25,7 @@ export type ApiCatalogProduct = {
   compare_at_price: string | null;
   stock: number;
   status: ProductStatus;
-  product_type: "simple" | "variable";
+  product_type: "simple" | "variable" | "digital";
   visibility: ProductVisibility;
   brand: string | null;
   category: string | null;
@@ -24,7 +35,9 @@ export type ApiCatalogProduct = {
   thumbnail: string | null;
   seo_title: string | null;
   seo_description: string | null;
+  warranty: string | null;
   tags: string[];
+  custom_specs_json: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -38,6 +51,8 @@ export type ApiProductVariant = {
   status: ProductStatus;
   is_default: boolean;
   sort_order: number;
+  image_id: string | null;
+  image_url: string | null;
 };
 
 export type ApiProductMediaLink = {
@@ -53,6 +68,7 @@ export type ApiProductMediaLink = {
 export type ApiProductDetail = ApiCatalogProduct & {
   variants: ApiProductVariant[];
   media: ApiProductMediaLink[];
+  has_inventory: boolean;
 };
 
 export type ApiProductListResponse = {
@@ -72,15 +88,19 @@ export type ApiProductDetailResponse = {
 };
 
 export type ProductDetail = Product & {
-  productType: "simple" | "variable";
+  productType: "simple" | "variable" | "digital";
   categoryId: string | null;
   brandId: string | null;
   attributeProfileId: string | null;
   shortDescription: string;
   metaTitle: string;
   metaDescription: string;
+  warranty: string | null;
+  customSpecsJson: string | null;
   mediaLinks: ApiProductMediaLink[];
   variants: ApiProductVariant[];
+  hasInventory: boolean;
+  specs?: ProductSpecs;
 };
 
 export type ProductSpecValue = {
@@ -139,8 +159,11 @@ export function apiProductDetailToProduct(row: ApiProductDetail): ProductDetail 
     attributeProfileId: row.attribute_profile_id,
     metaTitle: row.seo_title ?? "",
     metaDescription: row.seo_description ?? "",
+    warranty: row.warranty ?? null,
+    customSpecsJson: row.custom_specs_json ?? null,
     mediaLinks: row.media,
     variants: row.variants,
+    hasInventory: row.has_inventory ?? false,
   };
 }
 
@@ -151,19 +174,39 @@ export type CreateCatalogProductInput = {
   price: number;
   stock?: number;
   status?: ProductStatus;
-  product_type?: "simple" | "variable";
+  product_type?: "simple" | "variable" | "digital";
   visibility?: ProductVisibility;
   brand?: string;
   category?: string;
   brand_id?: string | null;
   category_id?: string | null;
+  attribute_profile_id?: string | null;
   description?: string;
   short_description?: string;
   thumbnail?: string;
   seo_title?: string;
   seo_description?: string;
+  warranty?: string | null;
   tags?: string[];
   compare_at_price?: number;
+  custom_specs_json?: string | null;
+};
+
+export type ProductInventoryInput = {
+  warehouse_id: string;
+  on_hand?: number;
+  min_qty?: number;
+  unit_cost?: number;
+};
+
+export type ProductInventoryRecord = {
+  id: string;
+  warehouseId: string;
+  warehouseName: string;
+  variantId: string;
+  onHand: number;
+  minQty: number;
+  unitCost: number;
 };
 
 export type UpdateCatalogProductInput = Partial<CreateCatalogProductInput>;
@@ -177,6 +220,7 @@ export type VariantUpsertInput = {
   status?: ProductStatus;
   is_default?: boolean;
   sort_order?: number;
+  image_id?: string | null;
 };
 
 function productPayload(input: CreateCatalogProductInput | UpdateCatalogProductInput) {
@@ -194,12 +238,15 @@ function productPayload(input: CreateCatalogProductInput | UpdateCatalogProductI
   if (input.category !== undefined) payload.category = input.category;
   if (input.brand_id !== undefined) payload.brand_id = input.brand_id;
   if (input.category_id !== undefined) payload.category_id = input.category_id;
+  if (input.attribute_profile_id !== undefined) payload.attribute_profile_id = input.attribute_profile_id;
   if (input.description !== undefined) payload.description = input.description;
   if (input.short_description !== undefined) payload.short_description = input.short_description;
   if (input.thumbnail !== undefined) payload.thumbnail = input.thumbnail;
   if (input.seo_title !== undefined) payload.seo_title = input.seo_title;
   if (input.seo_description !== undefined) payload.seo_description = input.seo_description;
+  if (input.warranty !== undefined) payload.warranty = input.warranty;
   if (input.tags !== undefined) payload.tags = input.tags;
+  if (input.custom_specs_json !== undefined) payload.custom_specs_json = input.custom_specs_json;
   return payload;
 }
 
@@ -232,6 +279,7 @@ export async function replaceProductVariants(
         status: v.status ?? "draft",
         is_default: v.is_default ?? false,
         sort_order: v.sort_order ?? idx,
+        image_id: v.image_id ?? null,
       })),
     }),
   });
@@ -290,4 +338,91 @@ export async function replaceProductSpecs(
       value: v.value,
     })),
   };
+}
+
+export async function checkCatalogProductSlug(
+  slug: string,
+  excludeId?: string,
+): Promise<{ slug: string; available: boolean; message?: string | null }> {
+  const params = new URLSearchParams({ slug });
+  if (excludeId) params.set("exclude_id", excludeId);
+  return apiFetch(`/api/v1/catalog/products/slug/check?${params.toString()}`);
+}
+
+function apiInventoryToRecord(row: {
+  id: string;
+  warehouse_id: string;
+  warehouse_name: string;
+  variant_id: string;
+  on_hand: number;
+  min_qty: number;
+  unit_cost: string;
+}): ProductInventoryRecord {
+  return {
+    id: row.id,
+    warehouseId: row.warehouse_id,
+    warehouseName: row.warehouse_name,
+    variantId: row.variant_id,
+    onHand: row.on_hand,
+    minQty: row.min_qty,
+    unitCost: parseFloat(row.unit_cost) || 0,
+  };
+}
+
+export async function fetchProductInventory(productId: string): Promise<ProductInventoryRecord | null> {
+  try {
+    const res = await apiFetch<{ data: { id: string; warehouse_id: string; warehouse_name: string; variant_id: string; on_hand: number; min_qty: number; unit_cost: string } }>(
+      `/api/v1/catalog/products/${productId}/inventory`,
+    );
+    return apiInventoryToRecord(res.data);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function fetchDigitalFiles(productId: string): Promise<DigitalFile[]> {
+  const res = await apiFetch<{ data: DigitalFile[]; errors: string[] }>(
+    `/api/v1/catalog/products/${productId}/digital-files`,
+  );
+  return res.data;
+}
+
+export async function uploadDigitalFile(productId: string, file: File): Promise<DigitalFile> {
+  const { getApiBaseUrl } = await import("@/lib/api/client");
+  const { getStoredAuthToken } = await import("@/lib/store/admin-auth-store");
+  const form = new FormData();
+  form.append("file", file);
+  const token = getStoredAuthToken();
+  const res = await fetch(`${getApiBaseUrl()}/api/v1/catalog/products/${productId}/digital-files`, {
+    method: "POST",
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const json = await res.json() as { data: DigitalFile };
+  return json.data;
+}
+
+export async function deleteDigitalFile(productId: string, fileId: string): Promise<void> {
+  await apiFetch(`/api/v1/catalog/products/${productId}/digital-files/${fileId}`, { method: "DELETE" });
+}
+
+export async function upsertProductInventory(
+  productId: string,
+  input: ProductInventoryInput,
+): Promise<ProductInventoryRecord> {
+  const res = await apiFetch<{ data: { id: string; warehouse_id: string; warehouse_name: string; variant_id: string; on_hand: number; min_qty: number; unit_cost: string } }>(
+    `/api/v1/catalog/products/${productId}/inventory`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        warehouse_id: input.warehouse_id,
+        on_hand: input.on_hand,
+        min_qty: input.min_qty,
+        unit_cost: input.unit_cost,
+      }),
+    },
+  );
+  return apiInventoryToRecord(res.data);
 }

@@ -24,6 +24,17 @@ class UserListResponse(BaseModel):
     meta: UserListMeta
 
 
+class MentionableUserRead(BaseModel):
+    id: str
+    username: str
+    name: str
+    role: str
+
+
+class MentionableUserListResponse(BaseModel):
+    data: List[MentionableUserRead]
+
+
 class UserResponse(BaseModel):
     data: UserRead
 

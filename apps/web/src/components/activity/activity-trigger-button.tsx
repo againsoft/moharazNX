@@ -22,6 +22,7 @@ export function ActivityTriggerButton({ entity, className, size = "sm", onClick 
       variant="ghost"
       size={size}
       title="Activity & Chatter"
+      aria-label="Activity & Chatter"
       className={cn("h-7 w-7 p-0 text-muted-foreground hover:text-foreground", className)}
       onClick={(e) => {
         e.stopPropagation();

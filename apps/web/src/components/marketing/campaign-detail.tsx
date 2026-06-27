@@ -11,7 +11,7 @@ import {
 } from "@/lib/mock-data/marketing";
 import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { Badge } from "@/components/ui/badge";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 function campaignStatusVariant(status: CampaignStatus) {

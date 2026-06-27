@@ -11,7 +11,7 @@ export function TrustFeatures() {
           const Icon = icons[i] ?? Truck;
           return (
             <div key={item.id} className="flex items-start gap-2.5">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#eb6626]/10 text-[#eb6626]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#dc2626]/10 text-[#dc2626]">
                 <Icon className="h-4 w-4" aria-hidden />
               </div>
               <div className="min-w-0">

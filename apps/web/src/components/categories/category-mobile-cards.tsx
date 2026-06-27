@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { MobileCardActions } from "@/components/activity/mobile-card-actions";
 
 function ActiveBadge({ active }: { active: boolean }) {
   return <Badge variant={active ? "success" : "muted"}>{active ? "On" : "Off"}</Badge>;
@@ -68,24 +69,33 @@ export function CategoryMobileCards({
                 <ActiveBadge active={c.active} />
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(c)}>
-                  <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onAddChild(c)}>
-                  <Plus className="mr-2 h-3.5 w-3.5" /> Add subcategory
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onTurnOff(c)} className="text-destructive">
-                  <Archive className="mr-2 h-3.5 w-3.5" /> Turn off
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <MobileCardActions
+              entity={{
+                type: "category",
+                id: c.id,
+                label: c.name,
+                subtitle: `/${c.slug}`,
+              }}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onEdit(c)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onAddChild(c)}>
+                    <Plus className="mr-2 h-3.5 w-3.5" /> Add subcategory
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => onTurnOff(c)} className="text-destructive">
+                    <Archive className="mr-2 h-3.5 w-3.5" /> Turn off
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </MobileCardActions>
           </div>
         );
       })}

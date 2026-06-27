@@ -32,17 +32,19 @@ class ProductBase(BaseModel):
     compare_at_price: Optional[Decimal] = Field(default=None, ge=0)
     stock: int = Field(default=0, ge=0)
     status: str = Field(default="draft", pattern="^(draft|published|archived)$")
-    product_type: str = Field(default="simple", pattern="^(simple|variable)$")
+    product_type: str = Field(default="simple", pattern="^(simple|variable|digital)$")
     visibility: str = Field(default="public", pattern="^(public|private)$")
-    brand: Optional[str] = None
-    category: Optional[str] = None
+    brand: Optional[str] = Field(default=None, max_length=100)
+    category: Optional[str] = Field(default=None, max_length=100)
     brand_id: Optional[str] = None
     category_id: Optional[str] = None
     attribute_profile_id: Optional[str] = None
-    thumbnail: Optional[str] = None
-    seo_title: Optional[str] = None
+    thumbnail: Optional[str] = Field(default=None, max_length=500)
+    seo_title: Optional[str] = Field(default=None, max_length=255)
     seo_description: Optional[str] = None
+    warranty: Optional[str] = Field(default=None, max_length=200)
     tags: List[str] = Field(default_factory=list)
+    custom_specs_json: Optional[str] = None
 
     @field_validator("tags", mode="before")
     @classmethod
@@ -68,17 +70,19 @@ class ProductUpdate(BaseModel):
     compare_at_price: Optional[Decimal] = Field(default=None, ge=0)
     stock: Optional[int] = Field(default=None, ge=0)
     status: Optional[str] = Field(default=None, pattern="^(draft|published|archived)$")
-    product_type: Optional[str] = Field(default=None, pattern="^(simple|variable)$")
+    product_type: Optional[str] = Field(default=None, pattern="^(simple|variable|digital)$")
     visibility: Optional[str] = Field(default=None, pattern="^(public|private)$")
-    brand: Optional[str] = None
-    category: Optional[str] = None
+    brand: Optional[str] = Field(default=None, max_length=100)
+    category: Optional[str] = Field(default=None, max_length=100)
     brand_id: Optional[str] = None
     category_id: Optional[str] = None
     attribute_profile_id: Optional[str] = None
-    thumbnail: Optional[str] = None
-    seo_title: Optional[str] = None
+    thumbnail: Optional[str] = Field(default=None, max_length=500)
+    seo_title: Optional[str] = Field(default=None, max_length=255)
     seo_description: Optional[str] = None
+    warranty: Optional[str] = Field(default=None, max_length=200)
     tags: Optional[List[str]] = None
+    custom_specs_json: Optional[str] = None
 
 
 class ProductRead(ProductBase):
@@ -99,6 +103,8 @@ class ProductVariantBrief(BaseModel):
     status: str
     is_default: bool
     sort_order: int
+    image_id: Optional[str] = None
+    image_url: Optional[str] = None
 
 
 class ProductMediaBrief(BaseModel):
@@ -114,6 +120,7 @@ class ProductMediaBrief(BaseModel):
 class ProductDetailRead(ProductRead):
     variants: List[ProductVariantBrief] = Field(default_factory=list)
     media: List[ProductMediaBrief] = Field(default_factory=list)
+    has_inventory: bool = False
 
 
 class ProductListMeta(BaseModel):
@@ -166,6 +173,34 @@ class ProductSpecsReplace(BaseModel):
 
 class ProductSpecsResponse(BaseModel):
     data: ProductSpecsRead
+    errors: List[str] = []
+
+
+class ProductSlugCheckResponse(BaseModel):
+    slug: str
+    available: bool
+    message: Optional[str] = None
+
+
+class ProductInventoryUpsert(BaseModel):
+    warehouse_id: str = Field(min_length=1)
+    on_hand: Optional[int] = Field(default=None, ge=0)
+    min_qty: int = Field(default=10, ge=0)
+    unit_cost: Optional[Decimal] = Field(default=None, ge=0)
+
+
+class ProductInventoryRead(BaseModel):
+    id: str
+    warehouse_id: str
+    warehouse_name: str
+    variant_id: str
+    on_hand: int
+    min_qty: int
+    unit_cost: Decimal
+
+
+class ProductInventoryResponse(BaseModel):
+    data: ProductInventoryRead
     errors: List[str] = []
 
 

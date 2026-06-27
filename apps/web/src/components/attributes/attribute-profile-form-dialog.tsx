@@ -30,7 +30,7 @@ type Props = {
   groups: AttributeGroup[];
   attributes: AttributeSpec[];
   onSave?: (data: Partial<AttributeProfile>) => void;
-  onSaved?: () => void;
+  onSaved?: (profileId?: string) => void;
 };
 
 export function AttributeProfileFormDialog({
@@ -104,7 +104,7 @@ export function AttributeProfileFormDialog({
 
     void (async () => {
       try {
-        await saveAttributeProfileBulk({
+        const saved = await saveAttributeProfileBulk({
           profileId: activeProfileId ?? undefined,
           profileName: form.profileName.trim(),
           imageUrl: imageUrl.trim() || undefined,
@@ -112,7 +112,7 @@ export function AttributeProfileFormDialog({
         });
         toast.success("Attribute profile saved");
         onSave?.({ name: form.profileName.trim() });
-        onSaved?.();
+        onSaved?.(saved.id);
         onOpenChange(false);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "Save failed");

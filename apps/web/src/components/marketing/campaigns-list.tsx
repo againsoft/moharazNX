@@ -11,7 +11,7 @@ import {
 } from "@/lib/mock-data/marketing";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 function campaignStatusVariant(status: CampaignStatus) {

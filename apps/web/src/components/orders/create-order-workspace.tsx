@@ -27,7 +27,7 @@ import { useOrderStoreHydrated } from "@/lib/hooks/use-order-store-hydrated";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { OrdersNav } from "@/components/orders/orders-nav";
 import { AddCustomerDialog } from "@/components/customers/add-customer-dialog";
 import { AddProductDialog } from "@/components/products/add-product-dialog";

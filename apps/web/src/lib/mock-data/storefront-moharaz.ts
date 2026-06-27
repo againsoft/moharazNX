@@ -31,7 +31,11 @@ export const moharazStoreConfig = {
   tagline: "Bangladesh's trusted tech store — laptops, phones, components & more",
   currency: "BDT",
   phone: "+880 9613-786464",
+  whatsapp: "+8809613786464",
   supportEmail: "support@moharaznx.com",
+  address: "Mohara Tower, 2nd Floor, 75-76, Mirpur Road, Dhaka-1216, Bangladesh",
+  hours: "10:00 AM – 8:00 PM",
+  days: "Saturday – Thursday",
 };
 
 export const moharazPromoMessages = [
@@ -84,6 +88,15 @@ export const moharazHeroSlides: HeroSlide[] = computerHeroSlides.map((s) => ({
   subtitle: s.subtitle.replace(/TechPoint/gi, "MoharazNX"),
 }));
 
+const extraCategories: StorefrontCategory[] = [
+  { id: "mc_desktop", slug: "electronics", name: "Desktop PCs", image: csUnsplash("gpu", 400, 400), productCount: 29 },
+  { id: "mc_tablet", slug: "electronics", name: "Tablets", image: csUnsplash("laptop", 400, 400), productCount: 18 },
+  { id: "mc_camera", slug: "electronics", name: "Cameras", image: csUnsplash("gaming", 400, 400), productCount: 22 },
+  { id: "mc_net", slug: "electronics", name: "Networking", image: csUnsplash("gpu", 400, 400), productCount: 34 },
+  { id: "mc_acc", slug: "electronics", name: "Accessories", image: csUnsplash("laptop", 400, 400), productCount: 91 },
+  { id: "mc_print", slug: "electronics", name: "Printers", image: csUnsplash("gaming", 400, 400), productCount: 15 },
+];
+
 export const moharazCategories: StorefrontCategory[] = [
   ...computerCategories,
   ...categoriesFlat
@@ -96,7 +109,8 @@ export const moharazCategories: StorefrontCategory[] = [
       image: c.bannerUrl ?? c.iconUrl ?? csUnsplash("laptop", 400, 400),
       productCount: c.productCount,
     })),
-].slice(0, 8);
+  ...extraCategories,
+].slice(0, 12);
 
 export const moharazFeaturedProducts: StorefrontProduct[] = getMoharazCatalogProducts()
   .slice(0, 6)
@@ -119,15 +133,35 @@ export const moharazNewArrivals: StorefrontProduct[] =
 export const moharazAiPicks: StorefrontProduct[] =
   computerAiPicks.length >= 6 ? computerAiPicks : moharazFeaturedProducts.map((p) => ({ ...p, badge: "ai-pick" as const }));
 
-export const moharazBrands: StorefrontBrand[] = brandsSeed
-  .filter((b) => b.active)
-  .slice(0, 8)
-  .map((b) => ({
-    id: b.id,
-    name: b.name,
-    slug: b.slug,
-    logo: b.logoUrl ?? `https://placehold.co/120x40/1e293b/ffffff?text=${encodeURIComponent(b.name)}`,
-  }));
+const staticBrands: StorefrontBrand[] = [
+  { id: "sb_asus", name: "ASUS", slug: "asus", logo: "https://placehold.co/120x40/1e293b/ffffff?text=ASUS&font=montserrat" },
+  { id: "sb_dell", name: "Dell", slug: "dell", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Dell&font=montserrat" },
+  { id: "sb_hp", name: "HP", slug: "hp", logo: "https://placehold.co/120x40/1e293b/ffffff?text=HP&font=montserrat" },
+  { id: "sb_lenovo", name: "Lenovo", slug: "lenovo", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Lenovo&font=montserrat" },
+  { id: "sb_msi", name: "MSI", slug: "msi", logo: "https://placehold.co/120x40/1e293b/ffffff?text=MSI&font=montserrat" },
+  { id: "sb_samsung", name: "Samsung", slug: "samsung", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Samsung&font=montserrat" },
+  { id: "sb_apple", name: "Apple", slug: "apple", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Apple&font=montserrat" },
+  { id: "sb_acer", name: "Acer", slug: "acer", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Acer&font=montserrat" },
+  { id: "sb_gigabyte", name: "Gigabyte", slug: "gigabyte", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Gigabyte&font=montserrat" },
+  { id: "sb_intel", name: "Intel", slug: "intel", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Intel&font=montserrat" },
+  { id: "sb_amd", name: "AMD", slug: "amd", logo: "https://placehold.co/120x40/1e293b/ffffff?text=AMD&font=montserrat" },
+  { id: "sb_corsair", name: "Corsair", slug: "corsair", logo: "https://placehold.co/120x40/1e293b/ffffff?text=Corsair&font=montserrat" },
+];
+
+export const moharazBrands: StorefrontBrand[] = (() => {
+  const fromSeed = brandsSeed
+    .filter((b) => b.active)
+    .slice(0, 6)
+    .map((b) => ({
+      id: b.id,
+      name: b.name,
+      slug: b.slug,
+      logo: b.logoUrl ?? `https://placehold.co/120x40/1e293b/ffffff?text=${encodeURIComponent(b.name)}`,
+    }));
+  const seen = new Set(fromSeed.map((b) => b.slug));
+  const extras = staticBrands.filter((b) => !seen.has(b.slug));
+  return [...fromSeed, ...extras].slice(0, 12);
+})();
 
 export const moharazReviews: StorefrontReview[] = computerReviews.map((r) => ({
   ...r,

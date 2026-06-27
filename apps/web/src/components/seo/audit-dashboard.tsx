@@ -39,7 +39,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Badge } from "@/components/ui/badge";
 
 /* ─── Severity config ─────────────────────────────────────────────────────── */

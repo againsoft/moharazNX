@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,11 +15,16 @@ from app.models.catalog_product_attribute_value import CatalogProductAttributeVa
 from app.models.catalog_product_media import CatalogProductMedia
 from app.models.catalog_product_variant import CatalogProductVariant
 from app.models.catalog_attribute import CatalogAttribute
+from app.models.inventory_stock_level import InventoryStockLevel
+from app.models.inventory_warehouse import InventoryWarehouse
 from app.models.media import Media
 from app.schemas.product import (
     ProductCreate,
     ProductDetailRead,
     ProductDetailResponse,
+    ProductInventoryRead,
+    ProductInventoryResponse,
+    ProductInventoryUpsert,
     ProductListMeta,
     ProductListResponse,
     ProductMediaBrief,
@@ -29,6 +35,7 @@ from app.schemas.product import (
     ProductSpecsReplace,
     ProductSpecsResponse,
     ProductSpecValueRead,
+    ProductSlugCheckResponse,
     ProductUpdate,
     ProductVariantBrief,
     dump_tags,
@@ -37,6 +44,25 @@ from app.schemas.product import (
 from app.schemas.variant import VariantBulkReplace, VariantUpsert
 
 router = APIRouter(prefix="/products", tags=["catalog-products"])
+
+
+def _compute_stock_status(on_hand: int, min_qty: int, max_qty: int = 0) -> str:
+    if on_hand <= 0:
+        return "out_of_stock"
+    if on_hand < min_qty:
+        return "low_stock"
+    if max_qty > 0 and on_hand > max_qty:
+        return "overstock"
+    return "in_stock"
+
+
+def _default_variant(db: Session, product_id: str) -> Optional[CatalogProductVariant]:
+    return (
+        db.query(CatalogProductVariant)
+        .filter(CatalogProductVariant.product_id == product_id)
+        .order_by(CatalogProductVariant.is_default.desc(), CatalogProductVariant.sort_order)
+        .first()
+    )
 
 
 def _resolve_brand_category(db: Session, data: dict) -> dict:
@@ -89,13 +115,19 @@ def _product_read(row: CatalogProduct) -> ProductRead:
         thumbnail=row.thumbnail,
         seo_title=row.seo_title,
         seo_description=row.seo_description,
+        warranty=row.warranty,
         tags=load_tags(row.tags_json),
+        custom_specs_json=row.custom_specs_json,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
 
 
-def _variant_brief(variant: CatalogProductVariant) -> ProductVariantBrief:
+def _variant_brief(variant: CatalogProductVariant, db: Optional[Session] = None) -> ProductVariantBrief:
+    image_url = None
+    if variant.image_id and db:
+        media = db.get(Media, variant.image_id)
+        image_url = media.url if media else None
     return ProductVariantBrief(
         id=variant.id,
         sku=variant.sku,
@@ -105,6 +137,8 @@ def _variant_brief(variant: CatalogProductVariant) -> ProductVariantBrief:
         status=variant.status,
         is_default=variant.is_default,
         sort_order=variant.sort_order,
+        image_id=variant.image_id,
+        image_url=image_url,
     )
 
 
@@ -135,10 +169,14 @@ def _product_detail(db: Session, row: CatalogProduct) -> ProductDetailRead:
         .order_by(CatalogProductMedia.sort_order, CatalogProductMedia.created_at)
         .all()
     )
+    has_inventory = db.query(InventoryStockLevel).filter(
+        InventoryStockLevel.product_id == row.id
+    ).first() is not None
     return ProductDetailRead(
         **base,
-        variants=[_variant_brief(v) for v in variants],
+        variants=[_variant_brief(v, db) for v in variants],
         media=[_media_brief(link, media) for link, media in media_rows],
+        has_inventory=has_inventory,
     )
 
 
@@ -200,15 +238,27 @@ def _replace_variants(
             row = existing[item.id]
             keep_ids.add(row.id)
         else:
-            row = CatalogProductVariant(product_id=product.id)
+            row = CatalogProductVariant(
+                product_id=product.id,
+                sku=item.sku,
+                name=item.name,
+                price=item.price,
+                stock=item.stock,
+                status=item.status,
+                is_default=item.is_default,
+                sort_order=item.sort_order if item.sort_order else idx,
+                image_id=item.image_id,
+            )
             db.add(row)
             db.flush()
             keep_ids.add(row.id)
+            continue
 
         row.sku = item.sku
         row.name = item.name
         row.price = item.price
         row.stock = item.stock
+        row.image_id = item.image_id
         row.status = item.status
         row.is_default = item.is_default
         row.sort_order = item.sort_order if item.sort_order else idx
@@ -243,10 +293,68 @@ def _replace_media(db: Session, product: CatalogProduct, media_ids: List[str]) -
                 is_primary=idx == 0,
             ),
         )
-        if idx == 0 and media.media_type == "image":
+        if primary_url is None and media.media_type == "image":
             primary_url = media.url
-    if primary_url:
+    if primary_url is not None:
         product.thumbnail = primary_url
+
+
+def _upsert_product_inventory(
+    db: Session,
+    product: CatalogProduct,
+    variant: CatalogProductVariant,
+    payload: ProductInventoryUpsert,
+) -> ProductInventoryRead:
+    warehouse = db.get(InventoryWarehouse, payload.warehouse_id)
+    if not warehouse:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+
+    on_hand = payload.on_hand if payload.on_hand is not None else product.stock
+    unit_cost = payload.unit_cost if payload.unit_cost is not None else Decimal("0")
+    min_qty = payload.min_qty
+    max_qty = max(on_hand * 3, 50) if on_hand > 0 else 50
+
+    display_name = product.name
+    if variant.name and variant.name != "Default":
+        display_name = f"{product.name} — {variant.name}"
+
+    row = (
+        db.query(InventoryStockLevel)
+        .filter(
+            InventoryStockLevel.variant_id == variant.id,
+            InventoryStockLevel.warehouse_id == payload.warehouse_id,
+        )
+        .first()
+    )
+    if not row:
+        row = InventoryStockLevel(
+            warehouse_id=payload.warehouse_id,
+            variant_id=variant.id,
+            product_id=product.id,
+            sku=variant.sku,
+            name=display_name,
+        )
+        db.add(row)
+
+    row.sku = variant.sku
+    row.name = display_name
+    row.on_hand = on_hand
+    row.min_qty = min_qty
+    row.max_qty = max_qty
+    row.unit_cost = unit_cost
+    row.thumbnail = product.thumbnail
+    row.status = _compute_stock_status(on_hand, min_qty, max_qty)
+    db.flush()
+
+    return ProductInventoryRead(
+        id=row.id,
+        warehouse_id=row.warehouse_id,
+        warehouse_name=warehouse.name,
+        variant_id=row.variant_id,
+        on_hand=row.on_hand,
+        min_qty=row.min_qty,
+        unit_cost=row.unit_cost,
+    )
 
 
 def _load_product_specs(db: Session, product: CatalogProduct) -> ProductSpecsRead:
@@ -317,6 +425,29 @@ def list_products(
         data=[_product_read(r) for r in rows],
         meta=ProductListMeta(count=total, page=page, per_page=per_page),
     )
+
+
+@router.get("/slug/check", response_model=ProductSlugCheckResponse)
+def check_product_slug(
+    slug: str = Query(..., min_length=1),
+    exclude_id: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+) -> ProductSlugCheckResponse:
+    normalized = slug.strip().lower()
+    if not normalized:
+        return ProductSlugCheckResponse(slug=normalized, available=False, message="Slug is required")
+
+    query = db.query(CatalogProduct).filter(CatalogProduct.slug == normalized)
+    if exclude_id:
+        query = query.filter(CatalogProduct.id != exclude_id)
+    taken = query.first()
+    if taken:
+        return ProductSlugCheckResponse(
+            slug=normalized,
+            available=False,
+            message="This URL is already in use",
+        )
+    return ProductSlugCheckResponse(slug=normalized, available=True)
 
 
 @router.get("/{product_id}", response_model=ProductDetailResponse)
@@ -481,6 +612,56 @@ def replace_product_specs(
     db.commit()
     db.refresh(row)
     return ProductSpecsResponse(data=_load_product_specs(db, row))
+
+
+@router.get("/{product_id}/inventory", response_model=ProductInventoryResponse)
+def get_product_inventory(product_id: str, db: Session = Depends(get_db)) -> ProductInventoryResponse:
+    row = db.get(CatalogProduct, product_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    stock_row = (
+        db.query(InventoryStockLevel, InventoryWarehouse.name)
+        .join(InventoryWarehouse, InventoryStockLevel.warehouse_id == InventoryWarehouse.id)
+        .filter(InventoryStockLevel.product_id == product_id)
+        .order_by(InventoryStockLevel.updated_at.desc())
+        .first()
+    )
+    if not stock_row:
+        raise HTTPException(status_code=404, detail="Inventory record not found for product")
+
+    stock, warehouse_name = stock_row
+    return ProductInventoryResponse(
+        data=ProductInventoryRead(
+            id=stock.id,
+            warehouse_id=stock.warehouse_id,
+            warehouse_name=warehouse_name,
+            variant_id=stock.variant_id,
+            on_hand=stock.on_hand,
+            min_qty=stock.min_qty,
+            unit_cost=stock.unit_cost,
+        ),
+    )
+
+
+@router.put("/{product_id}/inventory", response_model=ProductInventoryResponse)
+def upsert_product_inventory(
+    product_id: str,
+    payload: ProductInventoryUpsert,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_write_access),
+) -> ProductInventoryResponse:
+    row = db.get(CatalogProduct, product_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    variant = _default_variant(db, product_id)
+    if not variant:
+        raise HTTPException(status_code=400, detail="Product has no variant to track inventory")
+
+    data = _upsert_product_inventory(db, row, variant, payload)
+    db.commit()
+    return ProductInventoryResponse(data=data)
 
 
 @router.delete("/{product_id}", status_code=204)

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchCatalogProductDetail,
+  fetchProductSpecs,
   type ProductDetail,
 } from "@/lib/api/use-catalog-products";
 
@@ -28,7 +29,11 @@ export function useCatalogProduct(id: string | null | undefined): UseCatalogProd
     setLoading(true);
     setError(null);
     try {
-      setProduct(await fetchCatalogProductDetail(id));
+      const [detail, specs] = await Promise.all([
+        fetchCatalogProductDetail(id),
+        fetchProductSpecs(id).catch(() => undefined),
+      ]);
+      setProduct({ ...detail, specs: specs ?? undefined });
     } catch (err) {
       setProduct(null);
       setError(err instanceof Error ? err.message : "Product not found");

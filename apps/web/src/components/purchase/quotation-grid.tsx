@@ -20,7 +20,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { useIsDark } from "@/lib/use-is-dark";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { SupplierNav } from "@/components/suppliers/supplier-nav";
 
 const PAGE_SIZE = 25;

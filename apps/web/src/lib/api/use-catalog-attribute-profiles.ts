@@ -130,6 +130,24 @@ export async function saveAttributeProfileBulk(
   return apiProfileToProfile(res.data);
 }
 
+/** Same as saveAttributeProfileBulk but returns flat AttributeSpec[] for all groups */
+export async function saveAttributeProfileBulkWithSpecs(
+  input: BulkSaveProfileInput,
+): Promise<{ profile: AttributeProfile; attributes: AttributeSpec[] }> {
+  const payload = bulkSaveToApiPayload(input);
+  const url = input.profileId
+    ? `/api/v1/catalog/attribute-profiles/${input.profileId}/bulk`
+    : "/api/v1/catalog/attribute-profiles/bulk";
+  const res = await apiFetch<ApiAttributeProfileResponse>(url, {
+    method: input.profileId ? "PUT" : "POST",
+    body: JSON.stringify(payload),
+  });
+  const attrs: AttributeSpec[] = (res.data.groups ?? []).flatMap(
+    (g) => (g.attributes ?? []).map(apiAttributeToSpec),
+  );
+  return { profile: apiProfileToProfile(res.data), attributes: attrs };
+}
+
 export async function createAttributeProfile(
   input: CreateAttributeProfileInput,
 ): Promise<AttributeProfile> {

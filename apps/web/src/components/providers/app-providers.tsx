@@ -1,14 +1,13 @@
 "use client";
 
 import { Toaster } from "sonner";
-import { ThemeProvider } from "@/components/theme/theme-provider";
 import { CommandPalette } from "@/components/command-palette";
 import { AiAssistantDrawer } from "@/components/ai-assistant-drawer";
 import { ActivityDrawer } from "@/components/activity/activity-drawer";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
+    <>
       {children}
       <Toaster
         richColors
@@ -28,6 +27,6 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <CommandPalette />
       <AiAssistantDrawer />
       <ActivityDrawer />
-    </ThemeProvider>
+    </>
   );
 }

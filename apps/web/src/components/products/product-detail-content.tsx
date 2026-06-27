@@ -8,7 +8,9 @@ import {
   getDrawerVariantSpecGroups,
   getVariantFirstMediaIndex,
   type Product,
+  type ProductMedia,
 } from "@/lib/mock-data/products";
+import type { ApiProductMediaLink, ProductSpecs } from "@/lib/api/catalog-products";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,10 +65,22 @@ export function ProductDetailContent({
 
   const allMedia = useMemo(() => {
     if (simpleCatalog) {
+      const links: ApiProductMediaLink[] = (product as Product & { mediaLinks?: ApiProductMediaLink[] }).mediaLinks ?? [];
+      if (links.length > 0) {
+        return links
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((m): ProductMedia & { variantId: string } => ({
+            id: m.media_id,
+            type: m.media_type === "video" ? "video" : "image",
+            url: m.url,
+            isPrimary: m.is_primary,
+            variantId: "default",
+          }));
+      }
       return [{ id: product.id, type: "image" as const, url: product.thumbnail, variantId: "default" }];
     }
     return getAllVariantMedia(product.id);
-  }, [product.id, product.thumbnail, simpleCatalog]);
+  }, [product, simpleCatalog]);
   const variantFirstIndex = useMemo(
     () => (simpleCatalog ? { default: 0 } : getVariantFirstMediaIndex(allMedia)),
     [allMedia, simpleCatalog],
@@ -178,12 +192,14 @@ export function ProductDetailContent({
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-md border border-input bg-muted/30 px-2.5 py-2">
-          <p className="text-[10px] text-muted-foreground">Warehouse stock</p>
-          <p className={cn("text-sm font-semibold", variant.stock === 0 && "text-red-500")}>
-            {variant.stock}
-          </p>
-        </div>
+        {(!simpleCatalog || (product as Product & { hasInventory?: boolean }).hasInventory) && (
+          <div className="rounded-md border border-input bg-muted/30 px-2.5 py-2">
+            <p className="text-[10px] text-muted-foreground">Warehouse stock</p>
+            <p className={cn("text-sm font-semibold", variant.stock === 0 && "text-red-500")}>
+              {variant.stock}
+            </p>
+          </div>
+        )}
         <div className="rounded-md border border-input bg-muted/30 px-2.5 py-2">
           <p className="text-[10px] text-muted-foreground">Status</p>
           <Badge variant="secondary" className="mt-0.5 text-[10px]">
@@ -248,9 +264,10 @@ export function ProductDetailContent({
                 {product.name}
               </h2>
               {product.shortDescription && (
-                <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted-foreground">
-                  {product.shortDescription}
-                </p>
+                <div
+                  className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted-foreground [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0.5 [&_p]:mb-1 [&_strong]:font-semibold [&_em]:italic"
+                  dangerouslySetInnerHTML={{ __html: product.shortDescription }}
+                />
               )}
               {product.tags.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-1">
@@ -322,14 +339,28 @@ export function ProductDetailContent({
 
         <section className="rounded-lg border border-input p-4">
           <h3 className="text-sm font-semibold">Description</h3>
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {product.description ?? product.shortDescription ?? "No description provided."}
-          </p>
+          <div
+            className="mt-2 text-sm leading-relaxed text-muted-foreground [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0.5 [&_p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold"
+            dangerouslySetInnerHTML={{ __html: product.description ?? product.shortDescription ?? "No description provided." }}
+          />
         </section>
 
         <section className="space-y-4 pb-1">
           <h3 className="text-sm font-semibold">Specifications</h3>
-          {variantSpecGroups.length === 0 ? (
+          {simpleCatalog ? (() => {
+            const specs: ProductSpecs | undefined = (product as Product & { specs?: ProductSpecs }).specs;
+            if (!specs || specs.values.length === 0) return <p className="text-sm text-muted-foreground">No specifications yet.</p>;
+            return (
+              <dl className="divide-y divide-border/60 rounded-lg border border-input text-sm">
+                {specs.values.map((s) => (
+                  <div key={s.attributeId} className="flex justify-between gap-3 px-4 py-2.5">
+                    <dt className="text-muted-foreground">{s.attributeName}</dt>
+                    <dd className="text-right font-medium">{s.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            );
+          })() : variantSpecGroups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No specifications yet.</p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
@@ -380,16 +411,30 @@ export function ProductDetailContent({
           </div>
           <div className="rounded-lg border p-4 text-sm">
             <h3 className="font-medium">Description</h3>
-            <p className="mt-1.5 text-muted-foreground">
-              {product.description ?? product.shortDescription ?? "No description provided."}
-            </p>
+            <div
+              className="mt-1.5 text-muted-foreground [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:mb-0.5 [&_p]:mb-1 [&_strong]:font-semibold [&_em]:italic [&_h1]:text-lg [&_h1]:font-bold [&_h2]:text-base [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold"
+              dangerouslySetInnerHTML={{ __html: product.description ?? product.shortDescription ?? "No description provided." }}
+            />
           </div>
         </div>
       </div>
 
       <section className="space-y-4 rounded-lg border p-4">
         <h3 className="text-sm font-medium">Specifications</h3>
-        {variantSpecGroups.length === 0 ? (
+        {simpleCatalog ? (() => {
+          const specs: ProductSpecs | undefined = (product as Product & { specs?: ProductSpecs }).specs;
+          if (!specs || specs.values.length === 0) return <p className="text-sm text-muted-foreground">No specifications yet.</p>;
+          return (
+            <dl className="divide-y divide-border/60 rounded-lg border border-input text-sm">
+              {specs.values.map((s) => (
+                <div key={s.attributeId} className="flex justify-between gap-3 px-4 py-2.5">
+                  <dt className="text-muted-foreground">{s.attributeName}</dt>
+                  <dd className="text-right font-medium">{s.value}</dd>
+                </div>
+              ))}
+            </dl>
+          );
+        })() : variantSpecGroups.length === 0 ? (
           <p className="text-sm text-muted-foreground">No specifications yet.</p>
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">

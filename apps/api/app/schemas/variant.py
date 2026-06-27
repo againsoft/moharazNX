@@ -50,6 +50,7 @@ class VariantUpsert(BaseModel):
     status: str = Field(default="draft", pattern="^(draft|published|archived)$")
     is_default: bool = False
     sort_order: int = 0
+    image_id: Optional[str] = None
 
 
 class VariantBulkReplace(BaseModel):

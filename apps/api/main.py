@@ -26,6 +26,7 @@ from app.routers import (
     catalog_filters,
     catalog_products,
     catalog_variants,
+    digital_files,
     catalog_reviews,
     commerce_orders,
     commerce_customers,
@@ -126,6 +127,7 @@ app.include_router(catalog_brands.router, prefix="/api/v1/catalog", dependencies
 app.include_router(catalog_attribute_profiles.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_variants.router, prefix="/api/v1/catalog", dependencies=require_admin)
 app.include_router(catalog_reviews.router, prefix="/api/v1/catalog", dependencies=require_admin)
+app.include_router(digital_files.router, dependencies=require_admin)
 app.include_router(commerce_orders.router, prefix="/api/v1/commerce", dependencies=require_admin)
 app.include_router(commerce_customers.router, prefix="/api/v1/commerce", dependencies=require_admin)
 app.include_router(commerce_suppliers.router, prefix="/api/v1/commerce", dependencies=require_admin)

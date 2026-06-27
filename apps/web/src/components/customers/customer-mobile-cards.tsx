@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Crown, Phone, Mail, MapPin } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { ActivityTriggerButton } from "@/components/activity/activity-trigger-button";
 import {
   CUSTOMER_GROUP_LABELS,
   CUSTOMER_STATUS_LABELS,
@@ -45,11 +46,15 @@ export function CustomerMobileCards({ customers }: Props) {
           .toUpperCase();
 
         return (
-          <Link
+          <div
             key={c.id}
-            href={`/customers/${c.id}`}
-            className="block rounded-xl border border-input bg-card p-4 shadow-sm transition-all hover:shadow-md"
+            className="rounded-xl border border-input bg-card p-4 shadow-sm"
           >
+            <div className="flex items-start gap-1">
+              <Link
+                href={`/customers/${c.id}`}
+                className="min-w-0 flex-1 transition-all hover:opacity-90"
+              >
             {/* Row 1: avatar + name + badges */}
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
@@ -135,7 +140,18 @@ export function CustomerMobileCards({ customers }: Props) {
                 </span>
               </div>
             </div>
-          </Link>
+              </Link>
+              <ActivityTriggerButton
+                entity={{
+                  type: "customer",
+                  id: c.id,
+                  label: c.name,
+                  subtitle: c.customerId,
+                }}
+                className="h-8 w-8 shrink-0"
+              />
+            </div>
+          </div>
         );
       })}
     </div>

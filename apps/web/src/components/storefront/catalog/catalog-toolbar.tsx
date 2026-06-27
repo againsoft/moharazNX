@@ -2,7 +2,7 @@
 
 import { SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 import { CATALOG_SORT_OPTIONS, type CatalogSort } from "@/lib/mock-data/storefront-catalog";
 

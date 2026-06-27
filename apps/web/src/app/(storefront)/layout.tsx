@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import { CustomerSupportChatWidget } from "@/components/storefront/chat/customer-support-chat-widget";
+import { StorefrontLightTheme } from "@/components/storefront/storefront-light-theme";
 import { StorefrontFooter } from "@/components/storefront/storefront-footer";
 import { StorefrontHeader } from "@/components/storefront/storefront-header";
 import { MobileBottomNav } from "@/components/storefront/mobile-bottom-nav";
@@ -67,13 +68,13 @@ const jsonLd = {
 
 export default function StorefrontLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="storefront flex min-h-screen flex-col overflow-x-clip">
-      {/* Force light mode for storefront — overrides system dark preference */}
+    <div className="storefront flex min-h-screen flex-col overflow-x-clip bg-white">
+      <StorefrontLightTheme />
       <Script
         id="storefront-force-light"
         strategy="beforeInteractive"
         dangerouslySetInnerHTML={{
-          __html: `(function(){var r=document.documentElement;r.classList.remove('dark');r.setAttribute('data-theme','light');r.style.colorScheme='light';})();`,
+          __html: `(function(){var r=document.documentElement;r.classList.remove('dark','admin-site');r.classList.add('storefront-site');r.setAttribute('data-theme','light');r.style.colorScheme='light';if(document.body){document.body.classList.add('storefront-site');}})();`,
         }}
       />
       <Script

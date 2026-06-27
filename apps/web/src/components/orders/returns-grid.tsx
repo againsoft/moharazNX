@@ -16,7 +16,7 @@ import { formatCurrency } from "@/lib/utils";
 import { useAdminCanWrite } from "@/lib/hooks/use-admin-can-write";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
 import { ActivityTriggerButton } from "@/components/activity/activity-trigger-button";
 import { OrderSubGridShell } from "@/components/orders/order-sub-grid-shell";

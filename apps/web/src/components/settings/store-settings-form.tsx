@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { MediaLibraryModal } from "@/components/media/media-library-modal";
 import { STORE_STATUS_LABELS } from "@/lib/mock-data/stores";

@@ -6,7 +6,7 @@ import { Workflow } from "lucide-react";
 import type { MarketingJourney } from "@/lib/mock-data/marketing";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTIONS: MarketingJourney["status"][] = ["active", "draft", "paused"];

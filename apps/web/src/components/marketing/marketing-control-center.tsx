@@ -46,7 +46,7 @@ import { usePromotionStore } from "@/lib/store/promotion-store";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { MarketingNav } from "@/components/marketing/marketing-nav";
 
 function campaignStatusVariant(status: CampaignStatus) {

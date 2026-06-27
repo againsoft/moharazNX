@@ -23,7 +23,7 @@ import { useOrderStore } from "@/lib/store/order-store";
 import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -15,6 +15,8 @@ export type VariantMatrixRow = {
   stock: number;
   barcode?: string;
   isDefault?: boolean;
+  imageId?: string;
+  imageUrl?: string;
 };
 
 export type CatalogVariantRow = {

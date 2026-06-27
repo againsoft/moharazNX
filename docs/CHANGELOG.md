@@ -1,5 +1,79 @@
 # MoharazNX — Changelog
 
+| **Fixed** | Control Center entry — sidebar + top nav + login links to `/center`; reserved `center` slug; admin path redirect from storefront `[slug]` |
+
+| **Added** | Control Center UI Step 21 — collapsible sidebar (icon rail + persisted state); Notifications in nav; `UI_21_Collapsible_Sidebar.md` |
+
+| **Added** | Control Center UI Step 20 — ⌘K command palette (nav, clients, quick actions); header search trigger; `UI_20_Command_Palette.md` |
+
+| **Added** | Control Center UI Step 19 — platform notification bell in header + `/center/notifications` inbox; `UI_19_Notifications.md` |
+
+| **Added** | Control Center UI Step 18 — shared loading skeletons, empty states, route `loading.tsx`; `UI_18_Loading_Empty_States.md` |
+
+| **Added** | Control Center UI Step 17 — 24h CPU/RAM/API monitoring charts on fleet page + client detail sheet; `UI_17_Monitoring_Charts.md` |
+
+| **Added** | Control Center UI Step 16 — offline sync queues + diagnostics tabs on Edge Agent console; client agent tab cross-links; `UI_16_Offline_Sync_Diagnostics.md` |
+
+| **Added** | Control Center UI Step 15 — Edge Agent console (command queue, activation bundles); `UI_15_Edge_Agent_Console.md`; nav `/center/agents` |
+
+| **Added** | Control Center UI Step 14 — Chief AI daily briefing card on dashboard; specialist agent insights with deep links; `UI_14_Chief_AI_Briefing.md` |
+
+| **Added** | Control Center UI Step 13 — settings hub, operators RBAC, API keys; completes 13-step UI prototype; `UI_13_Settings.md` |
+
+| **Added** | Control Center UI Step 12 — immutable audit log grid, state diff detail sheet; `UI_12_Audit.md` |
+
+| **Added** | Control Center UI Step 11 — billing stats, invoice grid + detail sheet, fleet MRR tab; `UI_11_Billing.md` |
+
+| **Added** | Control Center UI Step 10 — AI provisioning, credit usage, platform AI agents, recommendations; `UI_10_AI_Access.md` |
+
+| **Added** | Control Center UI Step 09 — fleet backup status, recent runs, policy detail sheet (metadata only); `UI_09_Backups.md` |
+
+| **Added** | Control Center UI Step 08 — version catalog, rollout banners, fleet update grid + detail sheet; `UI_08_Updates.md` |
+
+| **Added** | Control Center UI Step 07 — agent heartbeat monitoring, alerts, metrics sheet; replaced legacy DB snapshots; `UI_07_Monitoring.md` |
+
+| **Added** | Control Center UI Step 06 — module catalog with dependencies, filters, detail sheet; `UI_06_Module_Management.md` |
+
+| **Added** | Control Center UI Step 05 — plan catalog, fleet subscriptions table, license grid + detail sheet; `UI_05_Subscriptions.md` |
+
+| **Added** | Control Center UI Step 04 — registrations queue, review sheet, approve/reject prototype, onboarding pipeline; `UI_04_Registrations.md` |
+
+| **Added** | Control Center UI Step 03 — client list filters, tabbed detail (overview/modules/agent/subscription); `UI_03_Clients.md` |
+
+| **Added** | Control Center UI Step 02 — dashboard KPI grid, alerts, activity feed, fleet health; docs `UI_02_Dashboard.md` |
+
+| **Added** | Control Center UI Step 01 — grouped sidebar nav, CenterPageHeader, placeholder routes; docs at `control/ControlCenter/UI/` |
+
+| **Added** | Control Center architecture docs — standalone project at `control/ControlCenter/` (Steps 01–17 + MASTER_INDEX); Apache `.htaccess`; aligned with AgainERP hybrid licensed ERP model |
+
+| **Fixed** | Local API startup — digital uploads path uses repo `uploads/` instead of Docker `/app/uploads`; Python 3.9 model/init_db compatibility |
+
+| **Added** | Control Center UI at `/center` — platform dashboard, client list/detail, registrations, subscriptions, modules, AI access, remote DB (dummy data) |
+
+| **Fixed** | Storefront dark flash — ThemeProvider removed from root; admin-only theme shell + 2s light guard |
+
+| **Fixed** | Storefront — prevent flash to dark/navy background after load (theme lock + CSS override) |
+
+| **Changed** | Storefront — pure white page background (`#ffffff`) |
+
+| **Changed** | Storefront — light theme only (no dark mode on public website; admin panel keeps theme toggle) |
+
+| **Changed** | Product add/edit form — removed Related Products section |
+
+| **Added** | Comment @mentions — autocomplete in activity drawer, mention highlight, notifications for mentioned users; `GET /auth/users/mentionable` for all roles |
+
+| **Added** | Mobile list cards — Activity trigger on products, orders, customers, brands, categories, attribute profiles; product edit form on mobile |
+
+| **Changed** | Activity drawer — neutral theme redesign for dark mode (card/muted/border tokens, no sky tints) |
+
+| **Changed** | Activity drawer — single compact timeline (activity + comments), mobile full-width with close button, fixed reply flow |
+
+| **Changed** | Activity drawer — Activity tab merges changes + comments; Comments tab has threaded replies and bottom compose only (no top comment box) |
+
+| **Changed** | Activity drawer — only Activity + Comments tabs; removed Files, Followers, Notes, AI, Overview; admin can filter all vs my activity, other roles see own activity only |
+
+| **Fixed** | Local admin login on port 3003 — CORS now allows localhost/127.0.0.1 ports 3000–3003 |
+
 | **Fixed** | Vercel admin login — `getApiBaseUrl()` falls back to Railway API when `NEXT_PUBLIC_API_URL` is unset on `.vercel.app` |
 
 | **Fixed** | Live admin login 500 — `ensure_auth_user_columns()` migrates legacy `auth_users` (adds/backfills `username`) on API startup; auth seed includes username |
@@ -419,9 +493,18 @@
 | **Backend** | `configurator_templates` table; CRUD + bulk status + duplicate at `/configurator/templates`; seed PC starter builds |
 | **Frontend** | Templates list wired to API; form sheet + hub count use template hook |
 
-## 2026-06-23 — Saved builds API (Step 39)
+## 2026-06-23 — Product create full DB wiring
 
 | Change | Detail |
 |--------|--------|
-| **Backend** | `configurator_builds` table; list + get + patch + bulk status + delete at `/configurator/builds`; seed sample customer builds |
-| **Frontend** | Builds list + detail sheet wired to API; hub count uses build hook |
+| **Backend** | `GET /catalog/products/slug/check`, `GET/PUT /catalog/products/{id}/inventory`; stock list filters by `product_id` |
+| **Frontend** | Product form saves all DB tables: products, variants, media, specs, inventory_stock_levels; API slug check; media upload to `/media/upload` |
+| **UI** | Removed mock tax/AI tabs; warehouse dropdown from `inventory_warehouses`; cost → `unit_cost` |
+
+## 2026-06-23 — Storefront light theme fix (Docker + FOUC)
+
+| Change | Detail |
+|--------|--------|
+| **Docker** | `docker-compose.run.yml` builds baked `moharaznx-web` image (no volume mounts); web container restarted on port 3002 |
+| **Theme** | Storefront init script forces white `backgroundColor` on html/body before paint; dark tokens scoped to `html.admin-site.dark` only |
+| **UI** | Promo top bar + PC builder CTA switched from navy to light/orange brand styling |

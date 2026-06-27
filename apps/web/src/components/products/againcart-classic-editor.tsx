@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ImageResizeOverlay } from "@/components/products/image-resize-overlay";
 import {
   AlignCenter,
   AlignLeft,
@@ -43,7 +44,7 @@ import {
 } from "@/lib/editor/editor-link";
 import { countEditorStats } from "@/lib/editor/editor-stats";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { Select } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { EditorInsertLinkDialog } from "@/components/products/editor-insert-link-dialog";
 import { EditorAiChatDrawer } from "@/components/products/editor-ai-chat-drawer";
@@ -57,6 +58,8 @@ type Props = {
   onChange: (value: string) => void;
   placeholder?: string;
   minRows?: number;
+  /** Label shown in toolbar left of Add Media */
+  fieldLabel?: string;
   /** Maps to Settings → AI → Prompts template for preset icon */
   aiContext?: EditorAiContextId;
   aiVariables?: Record<string, string | undefined>;
@@ -90,11 +93,12 @@ function getVisualSelectedText(container: HTMLElement | null): string {
 
 const LINE_HEIGHT_PX = 24;
 
-export function WordPressClassicEditor({
+export function AgaincartClassicEditor({
   value,
   onChange,
   placeholder = "Write your content…",
   minRows = 12,
+  fieldLabel,
   aiContext = "generic",
   aiVariables = {},
 }: Props) {
@@ -125,6 +129,11 @@ export function WordPressClassicEditor({
     (command: string, arg?: string) => {
       if (mode !== "visual") return;
       visualRef.current?.focus();
+      if (savedRangeRef.current) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(savedRangeRef.current);
+      }
       document.execCommand(command, false, arg);
       if (visualRef.current) {
         skipVisualSync.current = true;
@@ -139,7 +148,13 @@ export function WordPressClassicEditor({
     (tag: BlockFormat) => {
       if (mode !== "visual") return;
       visualRef.current?.focus();
-      applyBlockFormat(tag);
+      // Restore the saved selection so applyBlockFormat knows which block to change
+      if (savedRangeRef.current) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(savedRangeRef.current);
+      }
+      applyBlockFormat(tag, visualRef.current);
       if (visualRef.current) {
         skipVisualSync.current = true;
         emitChange(visualRef.current.innerHTML);
@@ -353,6 +368,8 @@ export function WordPressClassicEditor({
 
     const syncBlockFormat = () => {
       setBlockFormat(getCurrentBlockFormat(container));
+      // Keep savedRangeRef updated so block format dropdown can restore selection
+      savedRangeRef.current = cloneVisualSelectionRange(container);
     };
 
     document.addEventListener("selectionchange", syncBlockFormat);
@@ -463,18 +480,23 @@ export function WordPressClassicEditor({
     <>
       <div className="overflow-hidden rounded-md border border-input bg-background shadow-sm">
         <div className="flex items-center justify-between border-b border-input bg-muted/30 px-2 py-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1.5 px-2 text-[11px]"
-            onMouseDown={handleMediaMouseDown}
-            onClick={openMediaLibrary}
-          >
-            <ImagePlus className="h-3.5 w-3.5" />
-            Add Media
-          </Button>
           <div className="flex items-center gap-1">
+            {fieldLabel && (
+              <span className="mr-1 text-xs font-medium text-foreground">{fieldLabel}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1.5 px-2 text-[11px]"
+              onMouseDown={handleMediaMouseDown}
+              onClick={openMediaLibrary}
+            >
+              <ImagePlus className="h-3.5 w-3.5" />
+              Add Media
+            </Button>
             <div className="flex overflow-hidden rounded-md border border-input bg-background text-[11px]">
             <button
               type="button"
@@ -550,8 +572,11 @@ export function WordPressClassicEditor({
           <div className="flex flex-wrap items-center gap-0.5 border-b border-input bg-[#fcfcfc] px-2 py-1 dark:bg-muted/20">
             <Select
               value={blockFormat}
+              onMouseDown={() => {
+                // Save selection before dropdown steals focus
+                savedRangeRef.current = cloneVisualSelectionRange(visualRef.current);
+              }}
               onChange={(e) => handleBlockFormatChange(e.target.value as BlockFormat)}
-              onMouseDown={(e) => e.preventDefault()}
               className="mr-1 h-7 min-w-[118px] border-0 bg-transparent px-1.5 text-[11px] shadow-none focus-visible:ring-1"
               title="Text format"
               aria-label="Text format"
@@ -638,17 +663,26 @@ export function WordPressClassicEditor({
                 onInput={handleVisualInput}
                 className={cn(
                   "overflow-y-auto px-3 py-2 text-sm leading-relaxed outline-none",
-                  "prose prose-sm max-w-none dark:prose-invert",
                   "[&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-2xl [&_h1]:font-bold",
                   "[&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-xl [&_h2]:font-semibold",
                   "[&_h3]:mb-1.5 [&_h3]:mt-2.5 [&_h3]:text-lg [&_h3]:font-semibold",
                   "[&_h4]:mb-1 [&_h4]:mt-2 [&_h4]:text-base [&_h4]:font-semibold",
+                  "[&_p]:mb-1.5",
+                  "[&_ul]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5",
+                  "[&_ol]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-5",
+                  "[&_li]:mb-0.5",
                   "[&_blockquote]:border-l-4 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:italic",
                   "[&_a]:text-primary [&_a]:underline",
                   "[&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-md",
                 )}
                 style={{ height: editorHeight, minHeight: minEditorHeight }}
                 data-placeholder={placeholder}
+              />
+              <ImageResizeOverlay
+                containerRef={visualRef}
+                onResizeEnd={() => {
+                  if (visualRef.current) emitChange(visualRef.current.innerHTML);
+                }}
               />
               {isEmpty && !presetRunning && (
                 <p className="pointer-events-none absolute left-3 top-2 text-sm text-muted-foreground">

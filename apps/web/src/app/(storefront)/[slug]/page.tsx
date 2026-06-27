@@ -1,9 +1,10 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { Suspense } from "react";
 import { ProductDetailPageClient } from "@/components/storefront/product/product-detail-page-client";
 import { resolveStorefrontSlug } from "@/lib/url-slug/resolver";
 import { CatalogView } from "@/components/storefront/catalog/catalog-view";
 import { getStorefrontProductDetail } from "@/lib/mock-data/storefront-product";
+import { isAdminPath } from "@/lib/theme/is-storefront-path";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -42,6 +43,12 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function FlatSlugPage({ params }: PageProps) {
   const { slug } = await params;
+  const path = `/${slug}`;
+
+  if (isAdminPath(path)) {
+    permanentRedirect(path);
+  }
+
   const resolved = resolveStorefrontSlug(slug);
 
   if (!resolved) {

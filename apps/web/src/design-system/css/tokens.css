@@ -120,8 +120,8 @@
   --ai-accent-fg: #6d28d9;
 }
 
-.dark,
-[data-theme="dark"] {
+html.admin-site.dark,
+html.admin-site[data-theme="dark"] {
   color-scheme: dark;
 
   --background: #0b0f19;
